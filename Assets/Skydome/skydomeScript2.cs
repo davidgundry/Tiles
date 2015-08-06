@@ -66,7 +66,7 @@ public class skydomeScript2 : MonoBehaviour {
 	}
 	
 	void OnEnable () {
-        sunObj = GameObject.Find("SunLight");
+      /*  sunObj = GameObject.Find("SunLight");
 		if (sunObj == null)
 			sunObj= new GameObject("SunLight");
 		
@@ -77,10 +77,10 @@ public class skydomeScript2 : MonoBehaviour {
 		//sunLight.type = LightType.Directional;
 		sunLight.flare = sunFlare;
 		sunLight.shadows = shadowType;
-		Initialize();
+		Initialize();*/
 	}
 
-	void OnDisable() {
+	void OnDestroy() {
 		//DestroyImmediate(sunObj);	
 	}
 	
