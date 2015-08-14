@@ -23,6 +23,8 @@ public class MapBehaviour : MonoBehaviour, Clickable
     private float[,][] tileHeights;
     public Transform tileMarker;
 
+    public Transform treePrefab;
+
     private const int verticesPerTile = 24;
 
 	void Start () {
@@ -45,12 +47,26 @@ public class MapBehaviour : MonoBehaviour, Clickable
     {
         tileTypes[x, y] = type;
         TextureTile(x, y, TileTypeToTileTexture(type));
+        ClutterTile(x, y, type);
     }
 
     private void TextureTile(int x, int y, TileTexture texture)
     {
         MeshFilter mf = GetComponent<MeshFilter>();
         mf.mesh.uv = SetTileUV(mf.mesh.uv, x, y, texture);
+    }
+
+    private void ClutterTile(int x, int y, TileType type)
+    {
+        Transform clutter = null;
+        switch (type)
+        {
+            case TileType.Dirt:
+                clutter = (Transform)Instantiate(treePrefab, new Vector3(x+0.5f, tileHeights[x,y][0], y+0.5f), Quaternion.identity);
+                break;
+        }
+        if (clutter != null)
+            clutter.parent = transform;
     }
 
     public void NewMap(int width, int height, float[,][] tileHeights, TileType[,] tileTypes)

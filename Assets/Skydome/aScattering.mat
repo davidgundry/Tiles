@@ -104,7 +104,7 @@ Material:
       data:
         first:
           name: g_vEyePt
-        second: {r: -30.6186199, g: 25.5599995, b: -31.5986195, a: 0}
+        second: {r: -15.5905514, g: 25.0722752, b: -42.1196327, a: 0}
       data:
         first:
           name: g_vSunColor
