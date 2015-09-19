@@ -17,18 +17,20 @@ public enum TileType
 [RequireComponent(typeof(MeshCollider))]
 public class MapBehaviour : MonoBehaviour, Clickable
 {
-    private int width;
-    private int height;
-    private TileType[,] tileTypes;
-    private float[,][] tileHeights;
-    public Transform tileMarker;
+	private Map map;
+	public Map Map {
+		get {
+			return map;
+		}
+	}
+    private Transform tileMarker;
 
     public Transform treePrefab;
 
     private const int verticesPerTile = 24;
 
 	void Start () {
-
+		tileMarker = GameObject.Find ("TileMarker").transform;
 	}
 
     void Update()
@@ -45,7 +47,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
     private void SetTileType(int x, int y, TileType type)
     {
-        tileTypes[x, y] = type;
+        map.TileTypes[x, y] = type;
         TextureTile(x, y, TileTypeToTileTexture(type));
         ClutterTile(x, y, type);
     }
@@ -62,33 +64,30 @@ public class MapBehaviour : MonoBehaviour, Clickable
         switch (type)
         {
             case TileType.Dirt:
-                clutter = (Transform)Instantiate(treePrefab, new Vector3(x+0.5f, tileHeights[x,y][0], y+0.5f), Quaternion.identity);
+                clutter = (Transform)Instantiate(treePrefab, new Vector3(x+0.5f+transform.position.x, map.TileHeights[x,y][0], y+0.5f+transform.position.z), Quaternion.identity);
                 break;
         }
         if (clutter != null)
             clutter.parent = transform;
     }
-
-    public void NewMap(int width, int height, float[,][] tileHeights, TileType[,] tileTypes)
-    {
-        this.width = width;
-        this.height = height;
-        this.tileTypes = tileTypes;
-        this.tileHeights = tileHeights;
-
-        SetMapVertices();
-        SetMapTextures();
-    }
+	
+	public void NewMap(Map map)
+	{
+		this.map = map;
+		transform.position = new Vector3 (map.X, 0, map.Z);
+		SetMapVertices();
+		SetMapTextures();
+	}
 
     private void SetMapVertices()
     {
         MeshFilter mf = GetComponent<MeshFilter>();
 
-        Vector3[] verts = new Vector3[width * height * verticesPerTile];
+        Vector3[] verts = new Vector3[map.Width * map.Height * verticesPerTile];
 
-        for (int i = 0; i < width; i++)
-            for (int j = 0; j < height; j++)
-                SetTileVertices(verts, i, j, tileHeights[i, j]);
+        for (int i = 0; i < map.Width; i++)
+            for (int j = 0; j < map.Height; j++)
+                SetTileVertices(verts, i, j, map.TileHeights[i, j]);
 
         mf.mesh.vertices = verts;
 
@@ -106,7 +105,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
     private int TileCoordsToVertexIndex(int x, int y, int r)
     {
-        return verticesPerTile * (x + y * width) + r;
+        return verticesPerTile * (x + y * map.Width) + r;
     }
 
     private void UpdateMeshCollider()
@@ -169,10 +168,10 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
     private void SetMapTextures()
     {
-        TileTexture[,] textures = new TileTexture[width,height];
-        for (int i = 0; i < width; i++)
-            for (int j = 0; j < height; j++)
-                textures[i,j] = TileTypeToTileTexture(tileTypes[i,j]);
+        TileTexture[,] textures = new TileTexture[map.Width,map.Height];
+        for (int i = 0; i < map.Width; i++)
+            for (int j = 0; j < map.Height; j++)
+                textures[i,j] = TileTypeToTileTexture(map.TileTypes[i,j]);
 
         MeshFilter mf = GetComponent<MeshFilter>();
         mf.mesh.uv = UVsFromTextureMap(textures);
@@ -190,10 +189,10 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
     private Vector2[] UVsFromTextureMap(TileTexture[,] texture)
     {
-        Vector2[] uvs = new Vector2[width * height * verticesPerTile];
+        Vector2[] uvs = new Vector2[map.Width * map.Height * verticesPerTile];
 
-        for (int i = 0; i < width; i++)
-            for (int j = 0; j < height; j++)
+        for (int i = 0; i < map.Width; i++)
+            for (int j = 0; j < map.Height; j++)
                 uvs = SetTileUV(uvs, i, j, texture[i, j]);
 
         return uvs;
@@ -273,12 +272,12 @@ public class MapBehaviour : MonoBehaviour, Clickable
         List<Vector3> verts = new List<Vector3>();
         List<int> triangles = new List<int>();
         int tri = 0;
-        for (int i = 0; i < width; i++)
-            for (int j = 0; j < height; j++)
+        for (int i = 0; i < map.Width; i++)
+            for (int j = 0; j < map.Height; j++)
             {
                 if (i > 0) // Left edge
                 {
-                    if (tileHeights[i, j][1] != tileHeights[i - 1, j][3])
+                    if (map.TileHeights[i, j][1] != map.TileHeights[i - 1, j][3])
                     {
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 7)]);
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 23)]);
@@ -289,7 +288,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
                         triangles.Add(tri + 0);
                         tri += 3;
                     }
-                    if (tileHeights[i, j][8] != tileHeights[i - 1, j][4])
+					if (map.TileHeights[i, j][8] != map.TileHeights[i - 1, j][4])
                     {
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 7)]);
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 22)]);
@@ -311,7 +310,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
                         tri += 3;
                     }
-                    if (tileHeights[i, j][7] != tileHeights[i - 1, j][5])
+					if (map.TileHeights[i, j][7] != map.TileHeights[i - 1, j][5])
                     {
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 11)]);
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 20)]);
@@ -370,7 +369,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
                     triangles.Add(tri + 0);
                     tri += 3;
                 }
-                if (i == width - 1)
+                if (i == map.Width - 1)
                 {
                     Vector3 v = surfaceVerts[TileCoordsToVertexIndex(i, j, 7)];
                     verts.Add(new Vector3(v.x, 0, v.z));
@@ -419,7 +418,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
                 if (j > 0) // Top edge
                 {
-                    if (tileHeights[i, j][1] != tileHeights[i, j - 1][7])
+					if (map.TileHeights[i, j][1] != map.TileHeights[i, j - 1][7])
                     {
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 1)]);
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 2)]);
@@ -430,7 +429,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
                         triangles.Add(tri + 2);
                         tri += 3;
                     }
-                    if (tileHeights[i, j][2] != tileHeights[i, j - 1][6])
+					if (map.TileHeights[i, j][2] != map.TileHeights[i, j - 1][6])
                     {
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j - 1, 17)]);
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 2)]);
@@ -454,7 +453,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
                         tri += 3;
                     }
-                    if (tileHeights[i, j][3] != tileHeights[i, j - 1][5])
+					if (map.TileHeights[i, j][3] != map.TileHeights[i, j - 1][5])
                     {
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 4)]);
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 5)]);
@@ -515,7 +514,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
                     triangles.Add(tri + 2);
                     tri += 3;
                 }
-                if (j == height - 1)
+                if (j == map.Height - 1)
                 {
                     verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 17)]);
                     verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 16)]);
@@ -592,7 +591,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
     public void OnClickFromCamera(Vector3 point)
     {
-        SetTileType((int) point.x, (int) point.z, TileType.Dirt);
+        SetTileType((int) (point.x - transform.position.x), (int) (point.z-transform.position.z), TileType.Dirt);
     }
 
     public void OnClickUpFromCamera(Vector3 point)
@@ -612,13 +611,13 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
     public void OnMouseOverFromCamera(Vector3 point)
     {
-        tileMarker.gameObject.SetActiveRecursively(true);
+        tileMarker.gameObject.SetActive(true);
         tileMarker.transform.position = new Vector3(Mathf.Floor(point.x) + 0.5f, point.y+0.01f, Mathf.Floor(point.z) + 0.5f);
     }
 
     public void OnMouseExit()
     {
-        tileMarker.gameObject.SetActiveRecursively(false);
+        tileMarker.gameObject.SetActive(false);
     }
 
 
