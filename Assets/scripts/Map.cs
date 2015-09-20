@@ -43,54 +43,37 @@ public class Map {
 			z = value;
 		}
 	}
-	
-	private TileType[,] tileTypes;
-	public TileType[,] TileTypes
-	{
-		get{
-			return tileTypes;
+
+	private Tile[,] tiles;
+	public Tile[,] Tiles {
+		get {
+			return tiles;
 		}
-		set{
-			tileTypes = value;
-		}
-	}
-	private float[,][] tileHeights;
-	public float[,][] TileHeights
-	{
-		get{
-			return tileHeights;
-		}
-		set{
-			tileHeights = value;
+		set {
+			tiles = value;
 		}
 	}
-	
-	Map(float x, float z, int width, int height, TileType[,]tileTypes, float[,][] tileHeights)
+
+	Map(float x, float z, Tile[,] tiles)
 	{
-		this.width = width;
-		this.height = height;
 		this.x = x;
 		this.z = z;
-		this.tileTypes = tileTypes;
-		this.tileHeights = tileHeights;
+		this.width = tiles.GetLength(0);
+		this.height = tiles.GetLength(1);
+		this.tiles = tiles;
 	}
 
 	public static Map Random(float x, float z, int width, int height)
 	{
-		float[,][]  tileHeights = new float[width, height][];
-		TileType[,]  tileTypes = new TileType[width, height];
-		
+		Tile[,] tiles = new Tile[width, height];
+
 		for (int i = 0; i < width; i++)
 			for (int j = 0; j < height; j++)
 			{
-			float tileHeight = UnityEngine.Random.Range(1, 5) / 2f;
-				tileHeights[i, j] = new float[9]; 
-				for (int h = 0; h < 9; h++)
-					tileHeights[i, j][h] = tileHeight;
-				tileTypes[i, j] = TileType.Grass;
+				tiles[i,j] = new Tile(i,j,(int) (UnityEngine.Random.Range(1, 5) / 2f),TileType.Grass);
 			}
 
-		return new Map(x,z,width,height,tileTypes,tileHeights);
+		return new Map(x,z, tiles);
 	}
 
 }
