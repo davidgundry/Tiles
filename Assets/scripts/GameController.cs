@@ -22,8 +22,8 @@ public class GameController : MonoBehaviour {
 		camera = mainCamera.GetComponent<CameraBehaviour> ();
 		maps = new Transform[3];
 		createMap (0, 0, 0);
-		createMap (1, 20, 20);
-		createMap (2, 30, 5);
+		//createMap (1, 20, 20);
+		//createMap (2, 30, 5);
     }
 	
 	void createMap(int mapID, float x, float z)

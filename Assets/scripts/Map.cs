@@ -70,7 +70,9 @@ public class Map {
 		for (int i = 0; i < width; i++)
 			for (int j = 0; j < height; j++)
 			{
-				tiles[i,j] = new Tile(i,j,(int) (UnityEngine.Random.Range(1, 5) / 2f),TileType.Grass);
+                byte top = (byte)(UnityEngine.Random.Range(1, 5) / 2f);
+                //if (top > 0)
+                tiles[i,j] = new Tile(top,TileType.Grass);
 			}
 
 		return new Map(x,z, tiles);

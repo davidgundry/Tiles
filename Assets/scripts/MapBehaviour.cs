@@ -7,53 +7,119 @@ using System.Collections.Generic;
 [RequireComponent(typeof(MeshCollider))]
 public class MapBehaviour : MonoBehaviour, Clickable
 {
-	private Map map;
+    public Transform treePrefab;
+
+    private Map map;
 	public Map Map {
 		get {
 			return map;
 		}
 	}
     private Transform tileMarker;
-
-    public Transform treePrefab;
-
     private const int verticesPerTile = 24;
 	private MeshFilter mf;
+    private MeshFilter bmf;
+    private MeshFilter wmf;
 	private Vector3[] verts;
+    private Vector3[] waterVerts;
 	private int scale = 2;
 
-	void Start () {
+    public void NewMap(Map map)
+    {
+        this.map = map;
+        transform.position = new Vector3(map.X, 0, map.Z);
+        SetMapVertices();
+        SetMapTextures();
+    }
+
+    void Start () {
 		tileMarker = GameObject.Find ("TileMarker").transform;
 		mf = GetComponent<MeshFilter>();
-		verts = mf.mesh.vertices;
-	}
+        bmf = transform.GetChild(0).GetComponent<MeshFilter>();
+        wmf = transform.GetChild(1).GetComponent<MeshFilter>();
+        verts = mf.mesh.vertices;
+        waterVerts = wmf.mesh.vertices;
+    }
 
     void Update()
     {
-		bool someDirtyMesh = false;
+        if (map != null)
+        {
+            bool someDirtyMesh = false;
+            bool someDirtyWater = false;
 
-		for (int i = 0; i < map.Width; i++)
-			for (int j = 0; j < map.Height; j++)
-			{
-				if (map.Tiles [i, j].DirtyMesh) {
-					someDirtyMesh = true;
-					SetTileVertices (i, j, map.Tiles [i, j].Heights);
-					map.Tiles [i, j].DirtyMesh = false;
-				}
-				if (map.Tiles [i, j].DirtyType) {
-					TextureTile (i, j, TileTypeToTileTexture (map.Tiles [i, j].Type));
-					ClutterTile (i, j, map.Tiles [i, j].Type);
-					map.Tiles [i, j].DirtyType = false;
-				}
-			}
+            for (int i = 0; i < map.Width; i++)
+                for (int j = 0; j < map.Height; j++)
+                {
+                    if (map.Tiles[i, j] != null)
+                    {
+                        if ((i>=1) && (j>=1) && (i < map.Width-1) && (j<map.Height-1))
+                        {
+                            byte[] surroundingHeights = new byte[8];
+                            surroundingHeights[0] = map.Tiles[i, j + 1].Heights[7];
+                            surroundingHeights[1] = map.Tiles[i, j + 1].Heights[6];
+                            surroundingHeights[2] = map.Tiles[i, j + 1].Heights[5];
 
-		if (someDirtyMesh)
-		{
-			mf.mesh.vertices = verts;
-			mf.mesh.RecalculateNormals();
-			UpdateMeshCollider();
-			SetBaseVertices();
-		}
+                            surroundingHeights[3] = map.Tiles[i+1, j].Heights[8];
+
+                            surroundingHeights[4] = map.Tiles[i, j-1].Heights[3];
+                            surroundingHeights[5] = map.Tiles[i, j-1].Heights[2];
+                            surroundingHeights[6] = map.Tiles[i, j-1].Heights[1];
+
+                            surroundingHeights[7] = map.Tiles[i - 1, j].Heights[4];
+
+
+                            byte[] surroundingDepths = new byte[8];
+                            surroundingDepths[0] = map.Tiles[i, j + 1].WaterDepths[7];
+                            surroundingDepths[1] = map.Tiles[i, j + 1].WaterDepths[6];
+                            surroundingDepths[2] = map.Tiles[i, j + 1].WaterDepths[5];
+
+                            surroundingDepths[3] = map.Tiles[i + 1, j].WaterDepths[8];
+
+                            surroundingDepths[4] = map.Tiles[i, j - 1].WaterDepths[3];
+                            surroundingDepths[5] = map.Tiles[i, j - 1].WaterDepths[2];
+                            surroundingDepths[6] = map.Tiles[i, j - 1].WaterDepths[1];
+
+                            surroundingDepths[7] = map.Tiles[i - 1, j].WaterDepths[4];
+
+                            map.Tiles[i, j].RecalculateWater(surroundingHeights, surroundingDepths);
+                        }
+
+
+                        if (map.Tiles[i, j].DirtyMesh)
+                        {
+                            someDirtyMesh = true;
+                            verts = SetTileVertices(verts, i, j, map.Tiles[i, j].Heights);
+                            map.Tiles[i, j].DirtyMesh = false;
+                        }
+                        if (map.Tiles[i, j].DirtyType)
+                        {
+                            TextureTile(i, j, TileTypeToTileTexture(map.Tiles[i, j].Type));
+                            ClutterTile(i, j, map.Tiles[i, j].Type);
+                            map.Tiles[i, j].DirtyType = false;
+                        }
+                        if (map.Tiles[i, j].DirtyWater)
+                        {
+                            someDirtyWater = true;
+                            waterVerts = SetTileVertices(waterVerts, i, j, map.Tiles[i, j].WaterHeights);
+                            map.Tiles[i, j].DirtyWater = false;
+                        }
+                    }
+                }
+
+            if (someDirtyMesh)
+            {
+                mf.mesh.vertices = verts;
+                mf.mesh.RecalculateNormals();
+                UpdateMeshCollider();
+                SetBaseVertices();
+            }
+            if (someDirtyWater)
+            {
+                wmf.mesh.vertices = waterVerts;
+                wmf.mesh.RecalculateNormals();
+            }
+        }
 
         /*if (!updatedTiles)
         {
@@ -64,7 +130,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
         }*/
 	
     }
-	
+
     private void TextureTile(int x, int y, TileTexture texture)
     {
         mf.mesh.uv = SetTileUV(mf.mesh.uv, x, y, texture);
@@ -86,32 +152,34 @@ public class MapBehaviour : MonoBehaviour, Clickable
 		if (map.Tiles[x,y].Clutter != null)
 			map.Tiles[x,y].Clutter.parent = transform;
     }
-	
-	public void NewMap(Map map)
-	{
-		this.map = map;
-		transform.position = new Vector3 (map.X, 0, map.Z);
-		SetMapVertices();
-		SetMapTextures();
-	}
 
     private void SetMapVertices()
     {
-		mf = GetComponent<MeshFilter> ();
+        mf = GetComponent<MeshFilter>();
+        bmf = transform.GetChild(0).GetComponent<MeshFilter>();
+        wmf = transform.GetChild(1).GetComponent<MeshFilter>();
         verts = new Vector3[map.Width * map.Height * verticesPerTile];
+        waterVerts = new Vector3[map.Width * map.Height * verticesPerTile];
 
         for (int i = 0; i < map.Width; i++)
             for (int j = 0; j < map.Height; j++)
-				SetTileVertices(i, j, map.Tiles[i,j].Heights);
+                if (map.Tiles[i, j] != null)
+                {
+                    SetTileVertices(verts, i, j, map.Tiles[i, j].Heights);
+                    SetTileVertices(waterVerts, i, j, map.Tiles[i, j].WaterHeights);
+                }
 
         mf.mesh.vertices = verts;
+        wmf.mesh.vertices = waterVerts;
 
         int[] newTriangles = new int[mf.mesh.vertices.Length];
         for (int i = 0; i < mf.mesh.vertices.Length; i++)
             newTriangles[i] = ((i / 3) + 1) * 3 - 1 - i % 3;
 
         mf.mesh.triangles = newTriangles;
+        wmf.mesh.triangles = newTriangles;
         mf.mesh.RecalculateNormals();
+        wmf.mesh.RecalculateNormals();
 
         UpdateMeshCollider();
 
@@ -130,7 +198,15 @@ public class MapBehaviour : MonoBehaviour, Clickable
         mc.sharedMesh = mf.mesh;
     }
 
-    private Vector3[] SetTileVertices(int x, int y, int[] tileHeight)
+    private Vector3[] SetTileVertices(Vector3[] vertices, int x, int y, byte[] tileHeight)
+    {
+        float[] floats = new float[tileHeight.Length];
+        for (int i = 0; i < tileHeight.Length; i++)
+            floats[i] = tileHeight[i];
+        return SetTileVertices(vertices, x, y,floats);
+    }
+
+    private Vector3[] SetTileVertices(Vector3[] vertices, int x, int y, float[] tileHeight)
     {
 		float halfTileWidth = 0.5f*scale;
 		float halfTileDepth = 0.5f*scale;
@@ -139,46 +215,46 @@ public class MapBehaviour : MonoBehaviour, Clickable
 		x *= scale;
 		y *= scale;
         // 0
-        verts[vert] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
-        verts[vert + 1] = new Vector3(x, tileHeight[1], y);
-        verts[vert + 2] = new Vector3(x + halfTileWidth, tileHeight[2], y);
+        vertices[vert] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
+        vertices[vert + 1] = new Vector3(x, tileHeight[1], y);
+        vertices[vert + 2] = new Vector3(x + halfTileWidth, tileHeight[2], y);
 
         // 1
-        verts[vert + 3] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
-        verts[vert + 4] = new Vector3(x + halfTileWidth, tileHeight[2], y);
-        verts[vert + 5] = new Vector3(x + halfTileWidth * 2, tileHeight[3], y);
+        vertices[vert + 3] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
+        vertices[vert + 4] = new Vector3(x + halfTileWidth, tileHeight[2], y);
+        vertices[vert + 5] = new Vector3(x + halfTileWidth * 2, tileHeight[3], y);
 
         //2
-        verts[vert + 6] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
-        verts[vert + 7] = new Vector3(x + halfTileWidth * 2, tileHeight[3], y);
-        verts[vert + 8] = new Vector3(x + halfTileWidth * 2, tileHeight[4], y+ halfTileDepth);
+        vertices[vert + 6] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
+        vertices[vert + 7] = new Vector3(x + halfTileWidth * 2, tileHeight[3], y);
+        vertices[vert + 8] = new Vector3(x + halfTileWidth * 2, tileHeight[4], y+ halfTileDepth);
 
         //3
-        verts[vert + 9] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
-        verts[vert + 10] = new Vector3(x + halfTileWidth * 2, tileHeight[4], y+ halfTileDepth);
-        verts[vert + 11] = new Vector3(x + halfTileWidth * 2, tileHeight[5], y+ halfTileDepth * 2);
+        vertices[vert + 9] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
+        vertices[vert + 10] = new Vector3(x + halfTileWidth * 2, tileHeight[4], y+ halfTileDepth);
+        vertices[vert + 11] = new Vector3(x + halfTileWidth * 2, tileHeight[5], y+ halfTileDepth * 2);
 
         //4
-        verts[vert + 12] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
-        verts[vert + 13] = new Vector3(x + halfTileWidth * 2, tileHeight[5], y+ halfTileDepth * 2);
-        verts[vert + 14] = new Vector3(x + halfTileWidth, tileHeight[6], y+ halfTileDepth * 2);
+        vertices[vert + 12] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
+        vertices[vert + 13] = new Vector3(x + halfTileWidth * 2, tileHeight[5], y+ halfTileDepth * 2);
+        vertices[vert + 14] = new Vector3(x + halfTileWidth, tileHeight[6], y+ halfTileDepth * 2);
 
         //5
-        verts[vert + 15] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
-        verts[vert + 16] = new Vector3(x + halfTileWidth, tileHeight[6], y+ halfTileDepth * 2);
-        verts[vert + 17] = new Vector3(x, tileHeight[7], y+ halfTileDepth * 2);
+        vertices[vert + 15] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
+        vertices[vert + 16] = new Vector3(x + halfTileWidth, tileHeight[6], y+ halfTileDepth * 2);
+        vertices[vert + 17] = new Vector3(x, tileHeight[7], y+ halfTileDepth * 2);
 
         //6
-        verts[vert + 18] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
-        verts[vert + 19] = new Vector3(x, tileHeight[7], y+ halfTileDepth * 2);
-        verts[vert + 20] = new Vector3(x, tileHeight[8], y+ halfTileDepth);
+        vertices[vert + 18] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
+        vertices[vert + 19] = new Vector3(x, tileHeight[7], y+ halfTileDepth * 2);
+        vertices[vert + 20] = new Vector3(x, tileHeight[8], y+ halfTileDepth);
 
         //7
-        verts[vert + 21] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
-        verts[vert + 22] = new Vector3(x, tileHeight[8], y+ halfTileDepth);
-        verts[vert + 23] = new Vector3(x, tileHeight[1], y);
+        vertices[vert + 21] = new Vector3(x + halfTileWidth, tileHeight[0], y+ halfTileDepth);
+        vertices[vert + 22] = new Vector3(x, tileHeight[8], y+ halfTileDepth);
+        vertices[vert + 23] = new Vector3(x, tileHeight[1], y);
 
-        return verts;
+        return vertices;
     }
 
 
@@ -187,7 +263,8 @@ public class MapBehaviour : MonoBehaviour, Clickable
         TileTexture[,] textures = new TileTexture[map.Width,map.Height];
         for (int i = 0; i < map.Width; i++)
             for (int j = 0; j < map.Height; j++)
-                textures[i,j] = TileTypeToTileTexture(map.Tiles[i,j].Type);
+                if (map.Tiles[i, j] != null)
+                    textures[i,j] = TileTypeToTileTexture(map.Tiles[i,j].Type);
 
         mf.mesh.uv = UVsFromTextureMap(textures);
     }
@@ -289,11 +366,59 @@ public class MapBehaviour : MonoBehaviour, Clickable
         for (int i = 0; i < map.Width; i++)
             for (int j = 0; j < map.Height; j++)
             {
-                if (i > 0) // Left edge
+                if (map.Tiles[i, j] != null)
                 {
-					if (map.Tiles[i,j].Heights[1] != map.Tiles[i-1,j].Heights[3])
+                    if ((i > 0) && (map.Tiles[i - 1, j] != null)) // Left edge
                     {
-                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 7)]);
+                        if (map.Tiles[i, j].Heights[1] != map.Tiles[i - 1, j].Heights[3])
+                        {
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 7)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 23)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 22)]);
+
+                            triangles.Add(tri + 2);
+                            triangles.Add(tri + 1);
+                            triangles.Add(tri + 0);
+                            tri += 3;
+                        }
+                        if (map.Tiles[i, j].Heights[8] != map.Tiles[i - 1, j].Heights[4])
+                        {
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 7)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 22)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 8)]);
+
+                            triangles.Add(tri + 2);
+                            triangles.Add(tri + 1);
+                            triangles.Add(tri + 0);
+
+                            tri += 3;
+
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 10)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 20)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 11)]);
+
+                            triangles.Add(tri + 2);
+                            triangles.Add(tri + 1);
+                            triangles.Add(tri + 0);
+
+                            tri += 3;
+                        }
+                        if (map.Tiles[i, j].Heights[7] != map.Tiles[i - 1, j].Heights[5])
+                        {
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 11)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 20)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 19)]);
+
+                            triangles.Add(tri + 2);
+                            triangles.Add(tri + 1);
+                            triangles.Add(tri + 0);
+                            tri += 3;
+                        }
+                    }
+                    else
+                    {
+                        Vector3 v = surfaceVerts[TileCoordsToVertexIndex(i, j, 23)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 23)]);
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 22)]);
 
@@ -301,12 +426,12 @@ public class MapBehaviour : MonoBehaviour, Clickable
                         triangles.Add(tri + 1);
                         triangles.Add(tri + 0);
                         tri += 3;
-                    }
-					if (map.Tiles[i,j].Heights[8] != map.Tiles[i-1,j].Heights[4])
-                    {
-                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 7)]);
+
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 23)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 22)]);
-                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 8)]);
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 22)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
 
                         triangles.Add(tri + 2);
                         triangles.Add(tri + 1);
@@ -314,140 +439,143 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
                         tri += 3;
 
-                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 10)]);
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 20)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 20)]);
-                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 11)]);
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 19)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
 
                         triangles.Add(tri + 2);
                         triangles.Add(tri + 1);
                         triangles.Add(tri + 0);
 
                         tri += 3;
-                    }
-					if (map.Tiles[i,j].Heights[7] != map.Tiles[i-1,j].Heights[5])
-                    {
-                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i - 1, j, 11)]);
+
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 19)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 20)]);
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 19)]);
 
+
                         triangles.Add(tri + 2);
                         triangles.Add(tri + 1);
                         triangles.Add(tri + 0);
                         tri += 3;
                     }
-                }
-                else
-                {
-                    Vector3 v = surfaceVerts[TileCoordsToVertexIndex(i, j, 23)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 23)]);
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 22)]);
-
-                    triangles.Add(tri + 2);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 0);
-                    tri += 3;
-
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 23)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 22)]);
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 22)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-
-                    triangles.Add(tri + 2);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 0);
-
-                    tri += 3;
-
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 20)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 20)]);
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 19)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-
-                    triangles.Add(tri + 2);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 0);
-
-                    tri += 3;
-
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 19)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 20)]);
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 19)]);
-
-
-                    triangles.Add(tri + 2);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 0);
-                    tri += 3;
-                }
-                if (i == map.Width - 1)
-                {
-                    Vector3 v = surfaceVerts[TileCoordsToVertexIndex(i, j, 7)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 7)]);
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 8)]);
-
-                    triangles.Add(tri + 0);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 2);
-                    tri += 3;
-
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 7)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 8)]);
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 8)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-
-                    triangles.Add(tri + 0);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 2);
-
-                    tri += 3;
-
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 10)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 10)]);
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 11)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-
-                    triangles.Add(tri + 0);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 2);
-
-                    tri += 3;
-
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 11)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 10)]);
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 11)]);
-
-                    triangles.Add(tri + 0);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 2);
-                    tri += 3;
-                }
-
-                if (j > 0) // Top edge
-                {
-					if (map.Tiles[i,j].Heights[1] != map.Tiles[i,j-1].Heights[7])
+                    if (i == map.Width - 1)
                     {
+                        Vector3 v = surfaceVerts[TileCoordsToVertexIndex(i, j, 7)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
+                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 7)]);
+                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 8)]);
+
+                        triangles.Add(tri + 0);
+                        triangles.Add(tri + 1);
+                        triangles.Add(tri + 2);
+                        tri += 3;
+
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 7)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
+                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 8)]);
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 8)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
+
+                        triangles.Add(tri + 0);
+                        triangles.Add(tri + 1);
+                        triangles.Add(tri + 2);
+
+                        tri += 3;
+
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 10)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
+                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 10)]);
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 11)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
+
+                        triangles.Add(tri + 0);
+                        triangles.Add(tri + 1);
+                        triangles.Add(tri + 2);
+
+                        tri += 3;
+
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 11)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
+                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 10)]);
+                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 11)]);
+
+                        triangles.Add(tri + 0);
+                        triangles.Add(tri + 1);
+                        triangles.Add(tri + 2);
+                        tri += 3;
+                    }
+
+                    if ((j > 0)  && (map.Tiles[i, j-1] != null)) // Top edge
+                    {
+                        if (map.Tiles[i, j].Heights[1] != map.Tiles[i, j - 1].Heights[7])
+                        {
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 1)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 2)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j - 1, 19)]);
+
+                            triangles.Add(tri);
+                            triangles.Add(tri + 1);
+                            triangles.Add(tri + 2);
+                            tri += 3;
+                        }
+                        if (map.Tiles[i, j].Heights[2] != map.Tiles[i, j - 1].Heights[6])
+                        {
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j - 1, 17)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 2)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j - 1, 16)]);
+
+
+                            triangles.Add(tri);
+                            triangles.Add(tri + 1);
+                            triangles.Add(tri + 2);
+
+                            tri += 3;
+
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 4)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j - 1, 13)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j - 1, 14)]);
+
+
+                            triangles.Add(tri);
+                            triangles.Add(tri + 1);
+                            triangles.Add(tri + 2);
+
+                            tri += 3;
+                        }
+                        if (map.Tiles[i, j].Heights[3] != map.Tiles[i, j - 1].Heights[5])
+                        {
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 4)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 5)]);
+                            verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j - 1, 13)]);
+
+                            triangles.Add(tri);
+                            triangles.Add(tri + 1);
+                            triangles.Add(tri + 2);
+                            tri += 3;
+                        }
+                    }
+                    else
+                    {
+
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 1)]);
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 2)]);
-                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j - 1, 19)]);
+                        Vector3 v = surfaceVerts[TileCoordsToVertexIndex(i, j, 1)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
 
                         triangles.Add(tri);
                         triangles.Add(tri + 1);
                         triangles.Add(tri + 2);
                         tri += 3;
-                    }
-					if (map.Tiles[i,j].Heights[2] != map.Tiles[i,j-1].Heights[6])
-                    {
-                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j - 1, 17)]);
+
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 1)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 2)]);
-                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j - 1, 16)]);
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 2)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
 
 
                         triangles.Add(tri);
@@ -457,8 +585,10 @@ public class MapBehaviour : MonoBehaviour, Clickable
                         tri += 3;
 
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 4)]);
-                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j - 1, 13)]);
-                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j - 1, 14)]);
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 5)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 4)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
 
 
                         triangles.Add(tri);
@@ -466,115 +596,65 @@ public class MapBehaviour : MonoBehaviour, Clickable
                         triangles.Add(tri + 2);
 
                         tri += 3;
-                    }
-					if (map.Tiles[i,j].Heights[3] != map.Tiles[i,j-1].Heights[5])
-                    {
+
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 4)]);
                         verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 5)]);
-                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j - 1, 13)]);
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 5)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
 
                         triangles.Add(tri);
                         triangles.Add(tri + 1);
                         triangles.Add(tri + 2);
                         tri += 3;
                     }
-                }
-                else
-                {
+                    if (j == map.Height - 1)
+                    {
+                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 17)]);
+                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 16)]);
+                        Vector3 v = surfaceVerts[TileCoordsToVertexIndex(i, j, 17)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
 
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 1)]);
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 2)]);
-                    Vector3 v = surfaceVerts[TileCoordsToVertexIndex(i, j, 1)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
+                        triangles.Add(tri + 2);
+                        triangles.Add(tri + 1);
+                        triangles.Add(tri + 0);
+                        tri += 3;
 
-                    triangles.Add(tri);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 2);
-                    tri += 3;
-
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 1)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 2)]);
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 2)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 17)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
+                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 16)]);
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 16)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
 
 
-                    triangles.Add(tri);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 2);
+                        triangles.Add(tri + 2);
+                        triangles.Add(tri + 1);
+                        triangles.Add(tri + 0);
 
-                    tri += 3;
+                        tri += 3;
 
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 4)]);
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 5)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 4)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-
-
-                    triangles.Add(tri);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 2);
-
-                    tri += 3;
-
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 4)]);
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 5)]);
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 5)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-
-                    triangles.Add(tri);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 2);
-                    tri += 3;
-                }
-                if (j == map.Height - 1)
-                {
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 17)]);
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 16)]);
-                    Vector3 v = surfaceVerts[TileCoordsToVertexIndex(i, j, 17)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-
-                    triangles.Add(tri + 2);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 0);
-                    tri += 3;
-
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 17)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 16)]);
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 16)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
+                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 14)]);
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 13)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 16)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
 
 
-                    triangles.Add(tri + 2);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 0);
+                        triangles.Add(tri + 2);
+                        triangles.Add(tri + 1);
+                        triangles.Add(tri + 0);
 
-                    tri += 3;
+                        tri += 3;
 
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 14)]);
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 13)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 16)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
+                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 16)]);
+                        verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 13)]);
+                        v = surfaceVerts[TileCoordsToVertexIndex(i, j, 13)];
+                        verts.Add(new Vector3(v.x, 0, v.z));
 
-
-                    triangles.Add(tri + 2);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 0);
-
-                    tri += 3;
-
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 16)]);
-                    verts.Add(surfaceVerts[TileCoordsToVertexIndex(i, j, 13)]);
-                    v = surfaceVerts[TileCoordsToVertexIndex(i, j, 13)];
-                    verts.Add(new Vector3(v.x, 0, v.z));
-
-                    triangles.Add(tri + 2);
-                    triangles.Add(tri + 1);
-                    triangles.Add(tri + 0);
-                    tri += 3;
+                        triangles.Add(tri + 2);
+                        triangles.Add(tri + 1);
+                        triangles.Add(tri + 0);
+                        tri += 3;
+                    }
                 }
             }
 
@@ -582,18 +662,17 @@ public class MapBehaviour : MonoBehaviour, Clickable
         for (int i = 0; i < meshVerts.Length; i++)
             meshVerts[i] = verts[i];
 
-        MeshFilter cmf = transform.GetChild(0).GetComponent<MeshFilter>();
-        if (cmf != null)
+        if (bmf != null)
         {
-			cmf.mesh.Clear ();
-            cmf.mesh.vertices = meshVerts;
+			bmf.mesh.Clear ();
+            bmf.mesh.vertices = meshVerts;
 
 			int[] newTriangles = new int[triangles.Count];
             for (int i = 0; i < newTriangles.Length; i++)
                 newTriangles[i] = triangles[i];
-            cmf.mesh.triangles = newTriangles;
+            bmf.mesh.triangles = newTriangles;
 
-            cmf.mesh.RecalculateNormals();
+            bmf.mesh.RecalculateNormals();
         }
 
         MeshCollider cmc = transform.GetChild(0).GetComponent<MeshCollider>();
@@ -604,7 +683,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
         }
     }
 
-	public void runRiversFrom (int x, int z)
+	/*public void runRiversFrom (int x, int z)
 	{
 
 	}
@@ -630,7 +709,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
 	private void RunRiver(int x, int z, byte inflow)
 	{
-		if ((x>=0) && (z>=0) && (x<map.Width) && (z < map.Height))
+		if ((x>=0) && (z>=0) && (x<map.Width) && (z < map.Height) && (Map.Tiles[x, z] != null))
 		{
 			byte outflow = 0;
 			
@@ -650,7 +729,12 @@ public class MapBehaviour : MonoBehaviour, Clickable
 				}
 				if ((i+x>=0) && (i+x<map.Width) && (j+z>=0) && (j+z<map.Height))
 				{
-					if (map.Tiles[i+x,j+z].Top <= Map.Tiles[x,z].Top-1)
+                    if (map.Tiles[i + x, j + z] == null)
+                    {
+                        outflow += (byte)(Mathf.Pow(2, (s + 2) % 8));
+                        RunRiver(i + x, j + z, (byte)(Mathf.Pow(2, (s + 6) % 8)));
+                    }
+                    else if (map.Tiles[i+x,j+z].Top <= Map.Tiles[x,z].Top-1)
 					{
 						outflow += (byte) (Mathf.Pow(2,(s+2)%8));
 						RunRiver(i+x, j+z, (byte) (Mathf.Pow(2,(s+6)%8)));
@@ -659,7 +743,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
 			}
 			map.Tiles[x,z].AddRiver(inflow,outflow);
 		}
-	}
+	}*/
 
 
     public void OnClickFromCamera(Vector3 point)
@@ -667,14 +751,15 @@ public class MapBehaviour : MonoBehaviour, Clickable
 		int x = (int)(point.x / scale - transform.position.x);
 		int z = (int)(point.z / scale - transform.position.z);
 
-		RunRiver(x, z,0);
+        //RunRiver(x, z,0);
+        map.Tiles[x, z].AddSpring();
 
 
-		//map.Tiles [(int)(point.x/scale - transform.position.x), (int)(point.z/scale - transform.position.z)].ChangeTypeClick();
-		//
-		//float x = point.x/scale - transform.position.x;
-		//float z = point.z/scale - transform.position.z;
-		//map.Tiles[(int)x, (int)z].ChangeHeightClick((x-(int)x)*scale,(z-(int)z)*scale);
+        //map.Tiles [(int)(point.x/scale - transform.position.x), (int)(point.z/scale - transform.position.z)].ChangeTypeClick();
+        //
+        //float x = point.x/scale - transform.position.x;
+        //float z = point.z/scale - transform.position.z;
+        //map.Tiles[(int)x, (int)z].ChangeHeightClick((x-(int)x)*scale,(z-(int)z)*scale);
     }
 
     public void OnClickUpFromCamera(Vector3 point)
