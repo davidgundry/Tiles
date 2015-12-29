@@ -55,6 +55,8 @@ public class CameraBehaviour : MonoBehaviour {
     private bool orbit = false;
     private bool cameraMoving = false;
     private Vector3 cameraMoveTarget;
+    private float lastPinchDistance;
+    private bool pinchTouch;
 
 	// Use this for initialization
     public void Start ()
@@ -79,6 +81,28 @@ public class CameraBehaviour : MonoBehaviour {
 
     void LateUpdate()
     {
+        ManageKeyInput();
+        ManageMouseInput();
+    }
+
+    public void moveCameraToPoint(Vector3 point)
+    {
+        cameraMoving = true;
+        cameraMoveTarget = point;
+    }
+
+    public static float ClampAngle(float angle, float min, float max)
+    {
+        if (angle < -360F)
+            angle += 360F;
+        if (angle > 360F)
+            angle -= 360F;
+        return Mathf.Clamp(angle, min, max);
+    }
+
+
+    private void ManageKeyInput()
+    {
         if (Input.GetKeyDown("o"))
             orbit = !orbit;
         if (Input.GetKeyDown("p"))
@@ -97,7 +121,49 @@ public class CameraBehaviour : MonoBehaviour {
                 transform.localPosition = new Vector3(transform.localPosition.x, transform.localPosition.y, -sphereRadius);
             }
         }
-        if ((Input.GetMouseButton(0)) || (Input.GetMouseButton(1)))
+    }
+
+    private void ManageMouseInput()
+    {
+        bool panning = Input.GetMouseButton(2);
+        bool unpanning = Input.GetMouseButtonUp(2);
+        bool rotating = Input.GetMouseButton(1);
+        bool unrotating = Input.GetMouseButtonUp(1);
+        bool clicking = Input.GetMouseButton(0);
+        bool unclicking = Input.GetMouseButtonUp(0);
+
+        float scrollInput = Input.GetAxis("ZoomCamera");
+        float xAxisMovement = Input.GetAxis("MoveCameraX");
+        float yAxisMovement = Input.GetAxis("MoveCameraY");
+
+
+
+        if (Input.touchCount >= 2)
+        {
+            Vector2 touch0 = Input.GetTouch(0).position;
+            Vector2 touch1 = Input.GetTouch(1).position;
+            float distance = Vector2.Distance(touch0, touch1);
+
+            if (!pinchTouch)
+                lastPinchDistance = distance;
+            float effect = 0.005f * (distance - lastPinchDistance);
+            scrollInput = effect;
+
+            lastPinchDistance = distance;
+            pinchTouch = true;
+        }
+        else if (Input.touchCount == 1)
+        {
+            panning = true;
+            clicking = false;
+            xAxisMovement = Input.touches[0].deltaPosition.x / 10;
+            yAxisMovement = Input.touches[0].deltaPosition.y / 10;
+        }
+
+        if (Input.touchCount < 2)
+            pinchTouch = false;
+
+        if ((clicking || rotating))
         {
             orbit = false;
             cameraMoving = false;
@@ -106,24 +172,24 @@ public class CameraBehaviour : MonoBehaviour {
         if ((!orbit) && (!cameraMoving))
         {
             // Ideally you'd want some kind of stack, so you're always doing whatever for the most recent button down
-            if ((Input.GetMouseButton(0)) && !(Input.GetMouseButton(1)) && !(Input.GetMouseButton(2)))
+            if ((clicking) && !(rotating) && !(panning))
             {
-                float xMove = Input.GetAxis("MoveCameraX");
-                float yMove = Input.GetAxis("MoveCameraY");
+                float xMove = xAxisMovement;
+                float yMove = yAxisMovement;
 
                 if (Mathf.Abs(xMove) + Mathf.Abs(yMove) > 0)
                     noLeftClickMove = false;
 
-                
+
                 if (!noLeftClickMove)
                 { // If we're dragging the mouse
 
                 }
             }
-            else if ((Input.GetMouseButton(1)) && !(Input.GetMouseButton(0)) && !(Input.GetMouseButton(2)))
+            else if ((rotating) && !(clicking) && !(panning))
             {
-                float xMove = Input.GetAxis("MoveCameraX") * xSpeed * 0.02f;
-                float yMove = Input.GetAxis("MoveCameraY") * ySpeed * 0.02f;
+                float xMove = xAxisMovement * xSpeed * 0.02f;
+                float yMove = yAxisMovement * ySpeed * 0.02f;
                 x += xMove;
                 y -= yMove;
                 y = ClampAngle(y, yMinLimit, yMaxLimit);
@@ -135,10 +201,10 @@ public class CameraBehaviour : MonoBehaviour {
                 if (Mathf.Abs(xMove) + Mathf.Abs(yMove) > 0)
                     noRightClickMove = false;
             }
-            else if ((Input.GetMouseButton(2)) && !(Input.GetMouseButton(0)) && !(Input.GetMouseButton(1)))
+            else if ((panning) && !(clicking) && !(rotating))
             {
-                float xMove = Input.GetAxis("MoveCameraX") * -xMoveSpeed * distance * 0.02f;
-                float yMove = Input.GetAxis("MoveCameraY") * -yMoveSpeed * distance * 0.02f;
+                float xMove = xAxisMovement * -xMoveSpeed * distance * 0.02f;
+                float yMove = yAxisMovement * -yMoveSpeed * distance * 0.02f;
 
                 if (Mathf.Abs(xMove) + Mathf.Abs(yMove) > 0)
                     noMiddleClickMove = false;
@@ -148,7 +214,7 @@ public class CameraBehaviour : MonoBehaviour {
                 if (squareDistanceFromCentre < Mathf.Pow(boundsDistance, 2))
                     target.transform.Translate(new Vector3(xMove, yMove, 0));
             }
-            else if (!(Input.GetMouseButton(2)) && !(Input.GetMouseButton(0)) && !(Input.GetMouseButton(1)))
+            else if (!(panning) && !(clicking) && !(rotating))
             {
                 // If we're just hovering
                 RaycastHit hit;
@@ -163,7 +229,7 @@ public class CameraBehaviour : MonoBehaviour {
             }
 
             // Reset the CameraTarget position to the top of the object from the canera's perspective
-            if ((Input.GetMouseButtonUp(1)) || (Input.GetMouseButton(2)))
+            if ((unrotating) || (panning))
             {
                 Ray ray = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
                 RaycastHit h = new RaycastHit();
@@ -175,7 +241,7 @@ public class CameraBehaviour : MonoBehaviour {
                 }
             }
 
-            if (((Input.GetMouseButton(0)) || (Input.GetMouseButton(1))) && !alreadyClicked)
+            if (((clicking) || (rotating)) && !alreadyClicked)
             {   // If we've just clicked the mouse
                 alreadyClicked = true;
                 RaycastHit hit;
@@ -185,15 +251,15 @@ public class CameraBehaviour : MonoBehaviour {
                 {
                     Clickable clickable = hit.transform.gameObject.GetComponent<Clickable>();
                     if (clickable != null)
-                        if (Input.GetMouseButton(0))
+                        if (clicking)
                             clickable.OnClickFromCamera(hit.point);
                         else
                             clickable.OnRightClickFromCamera(hit.point);
                 }
             }
-            else if (Input.GetMouseButton(2) && !alreadyClicked)
+            else if (panning && !alreadyClicked)
                 alreadyClicked = true;
-            else if (((Input.GetMouseButtonUp(0) || Input.GetMouseButtonUp(1) || Input.GetMouseButtonUp(2))) && (alreadyClicked))
+            else if (((unclicking || unrotating || unpanning)) && (alreadyClicked))
             {   // If we've just released the mouse
                 alreadyClicked = false;
                 if ((noRightClickMove) || (noLeftClickMove) || (noMiddleClickMove))
@@ -206,12 +272,12 @@ public class CameraBehaviour : MonoBehaviour {
                         Clickable clickable = hit.transform.gameObject.GetComponent<Clickable>();
                         if (clickable != null)
                         {
-                            if ((Input.GetMouseButtonUp(0)) && (noLeftClickMove))
+                            if ((unclicking) && (noLeftClickMove))
                                 clickable.OnClickUpFromCamera(hit.point);
-                            else if ((Input.GetMouseButtonUp(1)) && (noRightClickMove))
+                            else if ((unrotating) && (noRightClickMove))
                                 clickable.OnRightClickUpFromCamera(hit.point);
                         }
-                        if ((Input.GetMouseButtonUp(2)) && (noMiddleClickMove))
+                        if ((unpanning) && (noMiddleClickMove))
                             moveCameraToPoint(hit.point);
                     }
 
@@ -223,7 +289,7 @@ public class CameraBehaviour : MonoBehaviour {
         }
         else if (orbit)
         {   // If Orbiting
-            float xMove = orbitSpeed*xSpeed * 0.02f;
+            float xMove = orbitSpeed * xSpeed * 0.02f;
             float yMove = 0;// ySpeed * 0.02f;
             x += xMove;
             y -= yMove;
@@ -237,9 +303,9 @@ public class CameraBehaviour : MonoBehaviour {
                 noRightClickMove = false;
 
             // Let us auto move the camera during orbit
-            if (Input.GetMouseButton(2) && !alreadyClicked)
+            if (panning && !alreadyClicked)
                 alreadyClicked = true;
-            if (Input.GetMouseButtonUp(2) && alreadyClicked && noMiddleClickMove)
+            if (unpanning && alreadyClicked && noMiddleClickMove)
             {
                 RaycastHit hit;
                 Ray ray = GetComponent<Camera>().ScreenPointToRay(Input.mousePosition);
@@ -259,11 +325,10 @@ public class CameraBehaviour : MonoBehaviour {
             }
         }
 
-        float scrollInput = Input.GetAxis("ZoomCamera");
         if (scrollInput != 0)
             if (orthoOn)
             {
-                distance = Mathf.Clamp(distance - scrollInput* zoomSpeed, distanceMin, distanceMax);
+                distance = Mathf.Clamp(distance - scrollInput * zoomSpeed, distanceMin, distanceMax);
                 ortho = Matrix4x4.Ortho(-distance * aspect, distance * aspect, -distance, distance, near, far);
                 blender.BlendToMatrix(ortho, 0.15f);
             }
@@ -274,18 +339,4 @@ public class CameraBehaviour : MonoBehaviour {
             }
     }
 
-    public void moveCameraToPoint(Vector3 point)
-    {
-        cameraMoving = true;
-        cameraMoveTarget = point;
-    }
-
-    public static float ClampAngle(float angle, float min, float max)
-    {
-        if (angle < -360F)
-            angle += 360F;
-        if (angle > 360F)
-            angle -= 360F;
-        return Mathf.Clamp(angle, min, max);
-    }
 }
