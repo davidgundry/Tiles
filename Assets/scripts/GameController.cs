@@ -22,8 +22,8 @@ public class GameController : MonoBehaviour {
 		camera = mainCamera.GetComponent<CameraBehaviour> ();
 		maps = new Transform[3];
 		createMap (0, 0, 0);
-		//createMap (1, 20, 20);
-		//createMap (2, 30, 5);
+		createMap (1, 50, 50);
+		createMap (2, 50, 10);
     }
 	
 	void createMap(int mapID, float x, float z)
@@ -32,7 +32,7 @@ public class GameController : MonoBehaviour {
 			if (mapPrefab != null) {
 				maps [mapID] = Instantiate (mapPrefab);
 				mapBehaviour = maps [mapID].GetComponent<MapBehaviour> ();
-				mapBehaviour.NewMap(Map.Random(x,z, 5, 5));
+				mapBehaviour.NewMap(Map.Random(x,z, 10, 10));
 			} else
 				Debug.Log ("Map prefab not found!");
 		}

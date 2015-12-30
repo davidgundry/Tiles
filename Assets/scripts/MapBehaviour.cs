@@ -37,8 +37,112 @@ public class MapBehaviour : MonoBehaviour, Clickable
 		mf = GetComponent<MeshFilter>();
         bmf = transform.GetChild(0).GetComponent<MeshFilter>();
         wmf = transform.GetChild(1).GetComponent<MeshFilter>();
+        wmf.mesh.bounds = new Bounds(new Vector3(map.X + map.Width/2,0,map.Z+map.Height/2), new Vector3(map.Width, 256, map.Height));
         verts = mf.mesh.vertices;
         waterVerts = wmf.mesh.vertices;
+    }
+
+    void UpdateTile(int i, int j, out bool someDirtyMesh, out bool someDirtyWater)
+    {
+        someDirtyMesh = false;
+        someDirtyWater = false;
+
+        if (map.Tiles[i, j] != null)
+        {
+            byte[] surroundingHeights = new byte[16];
+            byte[] surroundingDepths = new byte[16];
+
+            if ((i>=0) && (j>=0) && (i < map.Width) && (j<map.Height))
+            {
+                if (j > 0)
+                {
+                    surroundingHeights[0] = map.Tiles[i, j - 1].Heights[7];
+                    surroundingHeights[1] = map.Tiles[i, j - 1].Heights[6];
+                    surroundingHeights[2] = map.Tiles[i, j - 1].Heights[5];
+                    surroundingDepths[0] = map.Tiles[i, j - 1].WaterDepths[7];
+                    surroundingDepths[1] = map.Tiles[i, j - 1].WaterDepths[6];
+                    surroundingDepths[2] = map.Tiles[i, j - 1].WaterDepths[5];
+                }
+
+                if ((j > 0 ) && (i < map.Width - 1))
+                {
+                    surroundingHeights[3] = map.Tiles[i + 1, j - 1].Heights[7];
+                    surroundingDepths[3] = map.Tiles[i + 1, j - 1].WaterDepths[7];
+                }
+
+                if (i < map.Width - 1)
+                {
+                    surroundingHeights[4] = map.Tiles[i + 1, j].Heights[1];
+                    surroundingHeights[5] = map.Tiles[i + 1, j].Heights[8];
+                    surroundingHeights[6] = map.Tiles[i + 1, j].Heights[7];
+                    surroundingDepths[4] = map.Tiles[i + 1, j].WaterDepths[1];
+                    surroundingDepths[5] = map.Tiles[i + 1, j].WaterDepths[8];
+                    surroundingDepths[6] = map.Tiles[i + 1, j].WaterDepths[7];
+                }
+
+                if ((j < map.Height - 1) && (i < map.Width - 1))
+                {
+                    surroundingHeights[7] = map.Tiles[i + 1, j + 1].Heights[1];
+                    surroundingDepths[7] = map.Tiles[i + 1, j + 1].WaterDepths[1];
+                }
+
+                if (j < map.Height - 1)
+                {
+                    surroundingHeights[8] = map.Tiles[i, j + 1].Heights[3];
+                    surroundingHeights[9] = map.Tiles[i, j + 1].Heights[2];
+                    surroundingHeights[10] = map.Tiles[i, j + 1].Heights[1];
+                    surroundingDepths[8] = map.Tiles[i, j + 1].WaterDepths[3];
+                    surroundingDepths[9] = map.Tiles[i, j + 1].WaterDepths[2];
+                    surroundingDepths[10] = map.Tiles[i, j + 1].WaterDepths[1];
+                }
+
+                if ((j < map.Height - 1) && (i > 0))
+                {
+                    surroundingHeights[11] = map.Tiles[i - 1, j + 1].Heights[3];
+                    surroundingDepths[11] = map.Tiles[i - 1, j + 1].WaterDepths[3];
+                }
+
+                if (i > 0)
+                {
+                    surroundingHeights[12] = map.Tiles[i - 1, j].Heights[5];
+                    surroundingHeights[13] = map.Tiles[i - 1, j].Heights[4];
+                    surroundingHeights[14] = map.Tiles[i - 1, j].Heights[3];
+                    surroundingDepths[12] = map.Tiles[i - 1, j].WaterDepths[5];
+                    surroundingDepths[13] = map.Tiles[i - 1, j].WaterDepths[4];
+                    surroundingDepths[14] = map.Tiles[i - 1, j].WaterDepths[3];
+                }
+
+                if ((j > 0) && (i > 0))
+                {
+                    surroundingHeights[15] = map.Tiles[i - 1, j - 1].Heights[5];
+                    surroundingDepths[15] = map.Tiles[i - 1, j - 1].WaterDepths[5];
+                }
+
+                map.Tiles[i, j].SurroundingHeights = surroundingHeights;
+                map.Tiles[i, j].SurroundingDepths = surroundingDepths;
+                map.Tiles[i, j].RecalculateWater();
+            }
+
+
+            if (map.Tiles[i, j].DirtyMesh)
+            {
+                someDirtyMesh = true;
+                verts = SetTileVertices(verts, i, j, map.Tiles[i, j].Heights);
+                map.Tiles[i, j].DirtyMesh = false;
+            }
+            if (map.Tiles[i, j].DirtyType)
+            {
+                TextureTile(i, j, TileTypeToTileTexture(map.Tiles[i, j].Type));
+                ClutterTile(i, j, map.Tiles[i, j].Type);
+                map.Tiles[i, j].DirtyType = false;
+            }
+            if (map.Tiles[i, j].DirtyWater)
+            {
+                someDirtyWater = true;
+                waterVerts = SetTileVertices(waterVerts, i, j, map.Tiles[i, j].WaterVerticesY);
+                map.Tiles[i, j].DirtyWater = false;
+            }
+        }
     }
 
     void Update()
@@ -50,62 +154,8 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
             for (int i = 0; i < map.Width; i++)
                 for (int j = 0; j < map.Height; j++)
-                {
-                    if (map.Tiles[i, j] != null)
-                    {
-                        if ((i>=1) && (j>=1) && (i < map.Width-1) && (j<map.Height-1))
-                        {
-                            byte[] surroundingHeights = new byte[8];
-                            surroundingHeights[0] = map.Tiles[i, j + 1].Heights[7];
-                            surroundingHeights[1] = map.Tiles[i, j + 1].Heights[6];
-                            surroundingHeights[2] = map.Tiles[i, j + 1].Heights[5];
-
-                            surroundingHeights[3] = map.Tiles[i+1, j].Heights[8];
-
-                            surroundingHeights[4] = map.Tiles[i, j-1].Heights[3];
-                            surroundingHeights[5] = map.Tiles[i, j-1].Heights[2];
-                            surroundingHeights[6] = map.Tiles[i, j-1].Heights[1];
-
-                            surroundingHeights[7] = map.Tiles[i - 1, j].Heights[4];
-
-
-                            byte[] surroundingDepths = new byte[8];
-                            surroundingDepths[0] = map.Tiles[i, j + 1].WaterDepths[7];
-                            surroundingDepths[1] = map.Tiles[i, j + 1].WaterDepths[6];
-                            surroundingDepths[2] = map.Tiles[i, j + 1].WaterDepths[5];
-
-                            surroundingDepths[3] = map.Tiles[i + 1, j].WaterDepths[8];
-
-                            surroundingDepths[4] = map.Tiles[i, j - 1].WaterDepths[3];
-                            surroundingDepths[5] = map.Tiles[i, j - 1].WaterDepths[2];
-                            surroundingDepths[6] = map.Tiles[i, j - 1].WaterDepths[1];
-
-                            surroundingDepths[7] = map.Tiles[i - 1, j].WaterDepths[4];
-
-                            map.Tiles[i, j].RecalculateWater(surroundingHeights, surroundingDepths);
-                        }
-
-
-                        if (map.Tiles[i, j].DirtyMesh)
-                        {
-                            someDirtyMesh = true;
-                            verts = SetTileVertices(verts, i, j, map.Tiles[i, j].Heights);
-                            map.Tiles[i, j].DirtyMesh = false;
-                        }
-                        if (map.Tiles[i, j].DirtyType)
-                        {
-                            TextureTile(i, j, TileTypeToTileTexture(map.Tiles[i, j].Type));
-                            ClutterTile(i, j, map.Tiles[i, j].Type);
-                            map.Tiles[i, j].DirtyType = false;
-                        }
-                        if (map.Tiles[i, j].DirtyWater)
-                        {
-                            someDirtyWater = true;
-                            waterVerts = SetTileVertices(waterVerts, i, j, map.Tiles[i, j].WaterHeights);
-                            map.Tiles[i, j].DirtyWater = false;
-                        }
-                    }
-                }
+                    if (Random.value > 0.95f)
+                        UpdateTile(i,j, out someDirtyMesh, out someDirtyWater);
 
             if (someDirtyMesh)
             {
@@ -166,7 +216,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
                 if (map.Tiles[i, j] != null)
                 {
                     SetTileVertices(verts, i, j, map.Tiles[i, j].Heights);
-                    SetTileVertices(waterVerts, i, j, map.Tiles[i, j].WaterHeights);
+                    //SetTileVertices(waterVerts, i, j, map.Tiles[i, j].WaterHeights);
                 }
 
         mf.mesh.vertices = verts;
@@ -748,11 +798,13 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
     public void OnClickFromCamera(Vector3 point)
     {
-		int x = (int)(point.x / scale - transform.position.x);
-		int z = (int)(point.z / scale - transform.position.z);
+        int x = (int)((point.x - transform.position.x) / scale);
+        int z = (int)((point.z - transform.position.z) / scale);
 
         //RunRiver(x, z,0);
         map.Tiles[x, z].AddSpring();
+        bool a, b;
+        UpdateTile(x, z, out a, out b);
 
 
         //map.Tiles [(int)(point.x/scale - transform.position.x), (int)(point.z/scale - transform.position.z)].ChangeTypeClick();
