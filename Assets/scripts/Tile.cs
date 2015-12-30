@@ -3,12 +3,12 @@ using System.Collections.Generic;
 
 public enum TileTexture : byte
 {
-	Dirt, Grass
+	Dirt, Grass, Stone, Sand
 }
 
 public enum TileType : byte
 {
-	Dirt, Grass, Water, Tree
+	Dirt, Grass, Water, Tree, Stone, Sand
 }
 
 public class Tile{
@@ -118,6 +118,10 @@ public class Tile{
 		get {
 			return type;
 		}
+        set {
+		    type = value;
+		    DirtyType = true;
+        }
 	}
 	public Transform Clutter {
 		get {
@@ -224,7 +228,7 @@ public class Tile{
                     if (mnd[i - 1] > 0)
                         vertexYs[i] = Mathf.Max(waterHeights[i], mnwh[i - 1]) + waterOffsetY;
                     else
-                        vertexYs[i] = waterHeights[i];
+                        vertexYs[i] = waterHeights[i] + waterOffsetY;
                 }
             }
             return vertexYs;
@@ -301,25 +305,6 @@ public class Tile{
         }
     }
 
-    public void ChangeTypeClick()
-	{
-		switch (type)
-		{
-			case TileType.Dirt:
-				type = TileType.Grass;
-				DirtyType = true;
-				break;
-			case TileType.Grass:
-				type = TileType.Tree;
-                DirtyType = true;
-				break;
-			case TileType.Tree:
-				type = TileType.Dirt;
-                DirtyType = true;
-				break;
-		}
-	}
-
 	public void ChangeHeightClick(float x, float z)
 	{
 		if ((x < 0.25f) && (z < 0.25f))
@@ -368,10 +353,16 @@ public class Tile{
         if (WaterSource)
             waterDepths[0] = (byte) (Mathf.Max(1,waterDepths[0]));
 
-        for (int i = 1; i < 9; i++)
+        if (waterDepths[0] > 0)
         {
-            if (h[0] + waterDepths[0] > h[i])
-                waterDepths[i] = (byte)(waterDepths[0]);// - Mathf.Min(0, h[i] - h[0]));
+            Water = true;
+            for (int i = 1; i < 9; i++)
+            {
+                if (waterDepths[i] > 0)
+                    Water = true;
+                if (h[0] + waterDepths[0] > h[i])
+                    waterDepths[i] = (byte)(waterDepths[0]);// - Mathf.Min(0, h[i] - h[0]));
+            }
         }
         DirtyWater = true;
 
@@ -424,10 +415,11 @@ public class Tile{
         for (int i=0;i<pointsToCheck.Count;i++)
             if (surroundingDepths[pointsToCheck[i]] > 0)
                 if (surroundingHeights[pointsToCheck[i]] + surroundingDepths[pointsToCheck[i]] > h[p+1])
-                    newDepth = 1;// (byte)Mathf.Max(newDepth, surroundingHeights[pointsToCheck[i]] + surroundingDepths[pointsToCheck[i]] - h[i + 1]);
+                    newDepth = 1;// (byte)Mathf.Max(newDepth, surroundingHeights[pointsToCheck[i]] + surroundingDepths[pointsToCheck[i]] - h[i + 1] - 1);
 
-        if (h[p+1] + newDepth > h[0] + waterDepths[0])
-            waterDepths[0] = (byte)(newDepth);// - Mathf.Min(0, h[0] - h[i+1]));
+        if (newDepth > 0)
+            if (h[p+1] + newDepth > h[0] + waterDepths[0])
+                waterDepths[0] = 1;// (byte)(newDepth);// - Mathf.Min(0, h[0] - h[i+1]));
 
         return newDepth;
     }

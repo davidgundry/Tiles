@@ -49,6 +49,24 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
         if (map.Tiles[i, j] != null)
         {
+            if (map.Tiles[i, j].Water)
+                if (map.Tiles[i, j].Type != TileType.Sand)
+                    map.Tiles[i, j].Type = TileType.Sand;
+
+            if (map.Tiles[i, j].Type == TileType.Stone)
+            {
+                bool sandNearby = false;
+                TileType[] neighbours = GetNeighbourTypes(i, j, 1);
+                foreach (TileType neighbourType in neighbours)
+                {
+                    if (neighbourType == TileType.Sand)
+                        sandNearby = true;
+                }
+                if (sandNearby)
+                    map.Tiles[i, j].Type = TileType.Grass;
+            }
+
+
             byte[] surroundingHeights = new byte[16];
             byte[] surroundingDepths = new byte[16];
 
@@ -323,8 +341,14 @@ public class MapBehaviour : MonoBehaviour, Clickable
     {
         switch (t)
         {
+            case TileType.Stone:
+                return TileTexture.Stone;
+            case TileType.Grass:
+                return TileTexture.Grass;
             case TileType.Dirt:
                 return TileTexture.Dirt;
+            case TileType.Sand:
+                return TileTexture.Sand;
         }
         return TileTexture.Grass;
     }
@@ -348,6 +372,10 @@ public class MapBehaviour : MonoBehaviour, Clickable
                 return new Vector2(0.05f, 0.05f);
             case TileTexture.Dirt:
                 return new Vector2(0.05f, 0.55f);
+            case TileTexture.Stone:
+                return new Vector2(0.55f, 0.55f);
+            case TileTexture.Sand:
+                return new Vector2(0.55f, 0.05f);
         }
         return new Vector2(0f, 0f);
     }
@@ -802,7 +830,12 @@ public class MapBehaviour : MonoBehaviour, Clickable
         int z = (int)((point.z - transform.position.z) / scale);
 
         //RunRiver(x, z,0);
-        map.Tiles[x, z].AddSpring();
+        if (map.Tiles[x,z].Type == TileType.Stone)
+            map.Tiles[x, z].AddSpring();
+
+        if ((map.Tiles[x, z].Type == TileType.Grass) && (!map.Tiles[x, z].Water))
+            map.Tiles[x, z].Type = TileType.Tree;
+
         bool a, b;
         UpdateTile(x, z, out a, out b);
 
@@ -894,4 +927,29 @@ public class MapBehaviour : MonoBehaviour, Clickable
             }
         return neighbours;
     }*/
+
+     public TileType[] GetNeighbourTypes(int x, int z, float distance)
+    {
+        int ceilDistance = (int)Mathf.Ceil(distance);
+        float myHeight = map.Tiles[x, z].Top;
+        List<TileType> neighbours = new List<TileType>();
+        for (int i = -ceilDistance; i <= ceilDistance; i++)
+            for (int j = -ceilDistance; j <= ceilDistance; j++)
+            {
+                if ((i + x >= 0) && (i + x < map.Width) && (j + z >= 0) && (j + z < map.Height))
+                {
+                    float twodDistance = i + j;
+                    if (twodDistance <= distance)
+                    {
+                        float tileY = map.Tiles[i + x, j + z].Top;
+                        float threedDistance = twodDistance + Mathf.Abs(myHeight - tileY);
+                        if (threedDistance <= distance)
+                        {
+                            neighbours.Add(map.Tiles[i + x, j + z].Type);
+                        }
+                    }
+                }
+            }
+        return neighbours.ToArray();
+    }
 }

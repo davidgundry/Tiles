@@ -164,13 +164,17 @@ public class CameraBehaviour : MonoBehaviour {
             clicking = false;
             xAxisMovement = Input.touches[0].deltaPosition.x / 10;
             yAxisMovement = Input.touches[0].deltaPosition.y / 10;
-            if ((xAxisMovement > 1) || (yAxisMovement> 1))
+            if ((xAxisMovement > 0.25f) || (yAxisMovement> 0.25f))
                 movedSinceTouch = true;
             touch = true;
         }
         else if ((touch) && (!movedSinceTouch))
         {
             clicking = true;
+            touch = false;
+        }
+        else
+        {
             touch = false;
             movedSinceTouch = false;
         }
