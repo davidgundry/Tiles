@@ -27,11 +27,11 @@ public class CameraBehaviour : MonoBehaviour {
     public float ySpeed = 100;
     public float orbitSpeed = 0.1f;
 
-    public float xMoveSpeed = 2;
-    public float yMoveSpeed = 2;
-    public float autoMoveSpeed = 0.5f;
+    public float xMoveSpeed = 1;
+    public float yMoveSpeed = 1;
+    public float autoMoveSpeed = 1f;
 
-    public float zoomSpeed = 5f;
+    public float zoomSpeed = 2.5f;
     public float perspectiveZoomSpeed = 20f;
 
     private float yMinLimit = 20f;
@@ -57,6 +57,8 @@ public class CameraBehaviour : MonoBehaviour {
     private Vector3 cameraMoveTarget;
     private float lastPinchDistance;
     private bool pinchTouch;
+    private bool movedSinceTouch;
+    private bool touch;
 
     public void Start ()
 	{
@@ -162,6 +164,15 @@ public class CameraBehaviour : MonoBehaviour {
             clicking = false;
             xAxisMovement = Input.touches[0].deltaPosition.x / 10;
             yAxisMovement = Input.touches[0].deltaPosition.y / 10;
+            if ((xAxisMovement > 1) || (yAxisMovement> 1))
+                movedSinceTouch = true;
+            touch = true;
+        }
+        else if ((touch) && (!movedSinceTouch))
+        {
+            clicking = true;
+            touch = false;
+            movedSinceTouch = false;
         }
 
         if (Input.touchCount < 2)

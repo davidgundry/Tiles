@@ -141,10 +141,10 @@ MonoBehaviour:
   xSpeed: 150
   ySpeed: 150
   orbitSpeed: .100000001
-  xMoveSpeed: 4
-  yMoveSpeed: 4
-  autoMoveSpeed: .5
-  zoomSpeed: 5
+  xMoveSpeed: 2
+  yMoveSpeed: 2
+  autoMoveSpeed: 1
+  zoomSpeed: 2.5
   perspectiveZoomSpeed: 20
   distanceMin: 2
   distanceMax: 20
