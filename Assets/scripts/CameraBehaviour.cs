@@ -8,8 +8,8 @@ public class CameraBehaviour : MonoBehaviour {
     //MatrixBlending properties
     private Matrix4x4 ortho,
                     perspective;
-    public float fov = 30f,
-                        near = .1f,
+    private float fov = 30f,
+                        near = 1f,
                         far = 1000f;
     private float aspect;
     private MatrixBlender blender;
@@ -22,23 +22,23 @@ public class CameraBehaviour : MonoBehaviour {
 	public bool inputEnabled = true;
 
     //Camera orbit properties
-    private float distance = 5.0f;
-    public float xSpeed = 10;
-    public float ySpeed = 100;
-    public float orbitSpeed = 0.1f;
+    private float distance = 20.0f;
+    private float xSpeed = 100;
+    private float ySpeed = 100;
+    private float orbitSpeed = 0.1f;
 
-    public float xMoveSpeed = 1;
-    public float yMoveSpeed = 1;
-    public float autoMoveSpeed = 1f;
+    private float xMoveSpeed = 2;
+    private float yMoveSpeed = 2;
+    private float autoMoveSpeed = 2f;
 
-    public float zoomSpeed = 2.5f;
-    public float perspectiveZoomSpeed = 20f;
+    private float zoomSpeed = 2.5f;
+    private float perspectiveZoomSpeed = 20f;
 
     private float yMinLimit = 20f;
     private float yMaxLimit = 80f;
 
-    public float distanceMin = 1f;
-    public float distanceMax = 20f;
+    private float distanceMin = 1f;
+    private float distanceMax = 50f;
 
     private float x = 0.0f;
     private float y = 0.0f;

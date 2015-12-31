@@ -56,19 +56,26 @@ public class MapBehaviour : MonoBehaviour, Clickable
             if (map.Tiles[i, j].Type == TileType.Stone)
             {
                 bool sandNearby = false;
+                bool treeNearby = false;
                 TileType[] neighbours = GetNeighbourTypes(i, j, 1);
                 foreach (TileType neighbourType in neighbours)
                 {
                     if (neighbourType == TileType.Sand)
                         sandNearby = true;
+                    if (neighbourType == TileType.Tree)
+                        treeNearby = true;
                 }
                 if (sandNearby)
                     map.Tiles[i, j].Type = TileType.Grass;
+                if (treeNearby)
+                    if (map.Tiles[i, j].Type == TileType.Stone)
+                        map.Tiles[i, j].Type = TileType.Grass;
             }
 
 
             byte[] surroundingHeights = new byte[16];
             byte[] surroundingDepths = new byte[16];
+            bool[] surroundingWaterEdgePresence = new bool[16];
 
             if ((i>=0) && (j>=0) && (i < map.Width) && (j<map.Height))
             {
@@ -80,6 +87,9 @@ public class MapBehaviour : MonoBehaviour, Clickable
                     surroundingDepths[0] = map.Tiles[i, j - 1].WaterDepths[7];
                     surroundingDepths[1] = map.Tiles[i, j - 1].WaterDepths[6];
                     surroundingDepths[2] = map.Tiles[i, j - 1].WaterDepths[5];
+                    surroundingWaterEdgePresence[0] = map.Tiles[i, j - 1].WaterEdges[7-1];
+                    surroundingWaterEdgePresence[1] = map.Tiles[i, j - 1].WaterEdges[6 - 1];
+                    surroundingWaterEdgePresence[2] = map.Tiles[i, j - 1].WaterEdges[5 - 1];
                 }
 
                 if ((j > 0 ) && (i < map.Width - 1))
@@ -96,12 +106,16 @@ public class MapBehaviour : MonoBehaviour, Clickable
                     surroundingDepths[4] = map.Tiles[i + 1, j].WaterDepths[1];
                     surroundingDepths[5] = map.Tiles[i + 1, j].WaterDepths[8];
                     surroundingDepths[6] = map.Tiles[i + 1, j].WaterDepths[7];
+                    surroundingWaterEdgePresence[4] = map.Tiles[i + 1, j].WaterEdges[1 - 1];
+                    surroundingWaterEdgePresence[5] = map.Tiles[i + 1, j].WaterEdges[8 - 1];
+                    surroundingWaterEdgePresence[6] = map.Tiles[i + 1, j].WaterEdges[7 - 1];
                 }
 
                 if ((j < map.Height - 1) && (i < map.Width - 1))
                 {
                     surroundingHeights[7] = map.Tiles[i + 1, j + 1].Heights[1];
                     surroundingDepths[7] = map.Tiles[i + 1, j + 1].WaterDepths[1];
+                    surroundingWaterEdgePresence[7] = map.Tiles[i + 1, j + 1].WaterEdges[1 - 1];
                 }
 
                 if (j < map.Height - 1)
@@ -112,12 +126,16 @@ public class MapBehaviour : MonoBehaviour, Clickable
                     surroundingDepths[8] = map.Tiles[i, j + 1].WaterDepths[3];
                     surroundingDepths[9] = map.Tiles[i, j + 1].WaterDepths[2];
                     surroundingDepths[10] = map.Tiles[i, j + 1].WaterDepths[1];
+                    surroundingWaterEdgePresence[8] = map.Tiles[i, j + 1].WaterEdges[3 - 1];
+                    surroundingWaterEdgePresence[9] = map.Tiles[i, j + 1].WaterEdges[2 - 1];
+                    surroundingWaterEdgePresence[10] = map.Tiles[i, j + 1].WaterEdges[1 - 1];
                 }
 
                 if ((j < map.Height - 1) && (i > 0))
                 {
                     surroundingHeights[11] = map.Tiles[i - 1, j + 1].Heights[3];
                     surroundingDepths[11] = map.Tiles[i - 1, j + 1].WaterDepths[3];
+                    surroundingWaterEdgePresence[11] = map.Tiles[i - 1, j + 1].WaterEdges[3 - 1];
                 }
 
                 if (i > 0)
@@ -128,16 +146,21 @@ public class MapBehaviour : MonoBehaviour, Clickable
                     surroundingDepths[12] = map.Tiles[i - 1, j].WaterDepths[5];
                     surroundingDepths[13] = map.Tiles[i - 1, j].WaterDepths[4];
                     surroundingDepths[14] = map.Tiles[i - 1, j].WaterDepths[3];
+                    surroundingWaterEdgePresence[12] = map.Tiles[i - 1, j].WaterEdges[5 - 1];
+                    surroundingWaterEdgePresence[13] = map.Tiles[i - 1, j].WaterEdges[4 - 1];
+                    surroundingWaterEdgePresence[14] = map.Tiles[i - 1, j].WaterEdges[3 - 1];
                 }
 
                 if ((j > 0) && (i > 0))
                 {
                     surroundingHeights[15] = map.Tiles[i - 1, j - 1].Heights[5];
                     surroundingDepths[15] = map.Tiles[i - 1, j - 1].WaterDepths[5];
+                    surroundingWaterEdgePresence[15] = map.Tiles[i - 1, j - 1].WaterEdges[5 - 1];
                 }
 
                 map.Tiles[i, j].SurroundingHeights = surroundingHeights;
                 map.Tiles[i, j].SurroundingDepths = surroundingDepths;
+                map.Tiles[i, j].SurroundingWaterEdgePresence = surroundingWaterEdgePresence;
                 map.Tiles[i, j].RecalculateWater();
             }
 
@@ -206,7 +229,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
     private void ClutterTile(int x, int y, TileType type)
     {
-		if (map.Tiles [x, y].Clutter != null) {
+		/*if (map.Tiles [x, y].Clutter != null) {
 			Object.Destroy (map.Tiles [x, y].Clutter.gameObject);
 			map.Tiles [x, y].Clutter = null;
 		}
@@ -218,7 +241,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
                 break;
         }
 		if (map.Tiles[x,y].Clutter != null)
-			map.Tiles[x,y].Clutter.parent = transform;
+			map.Tiles[x,y].Clutter.parent = transform;*/
     }
 
     private void SetMapVertices()
@@ -928,9 +951,9 @@ public class MapBehaviour : MonoBehaviour, Clickable
         return neighbours;
     }*/
 
-     public TileType[] GetNeighbourTypes(int x, int z, float distance)
+     public TileType[] GetNeighbourTypes(int x, int z, int distance)
     {
-        int ceilDistance = (int)Mathf.Ceil(distance);
+        int ceilDistance = distance;
         float myHeight = map.Tiles[x, z].Top;
         List<TileType> neighbours = new List<TileType>();
         for (int i = -ceilDistance; i <= ceilDistance; i++)
@@ -941,12 +964,12 @@ public class MapBehaviour : MonoBehaviour, Clickable
                     float twodDistance = i + j;
                     if (twodDistance <= distance)
                     {
-                        float tileY = map.Tiles[i + x, j + z].Top;
-                        float threedDistance = twodDistance + Mathf.Abs(myHeight - tileY);
-                        if (threedDistance <= distance)
-                        {
+                        //float tileY = map.Tiles[i + x, j + z].Top;
+                        //float threedDistance = twodDistance + Mathf.Abs(myHeight - tileY);
+                        //if (threedDistance <= distance)
+                        //{
                             neighbours.Add(map.Tiles[i + x, j + z].Type);
-                        }
+                        //}
                     }
                 }
             }

@@ -131,23 +131,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ceac15475c824274588a96e97c5c4432, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  fov: 20
-  near: 1
-  far: 100
   target: {fileID: 1345357388}
   bounds: {fileID: 1645316753}
   boundsDistance: 100
   inputEnabled: 1
-  xSpeed: 150
-  ySpeed: 150
-  orbitSpeed: .100000001
-  xMoveSpeed: 2
-  yMoveSpeed: 2
-  autoMoveSpeed: 1
-  zoomSpeed: 2.5
-  perspectiveZoomSpeed: 20
-  distanceMin: 2
-  distanceMax: 20
 --- !u!81 &48593626
 AudioListener:
   m_ObjectHideFlags: 0

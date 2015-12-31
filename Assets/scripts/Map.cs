@@ -70,9 +70,13 @@ public class Map {
 		for (int i = 0; i < width; i++)
 			for (int j = 0; j < height; j++)
 			{
-                byte top = (byte)(UnityEngine.Random.Range(1, 5));
+
+                byte top = (byte)(((i % 5 + j % 5) * ((i%20)+1) % ((j%20) + 1) + ((i%20) * (j%20))/ 10));// (byte)(UnityEngine.Random.Range(0, 5));
+                if ((i == 0) || (j == 0) || (i == width - 1) || (j == height - 1))
+                    top = 0;
                 //if (top > 0)
                 tiles[i,j] = new Tile(top,TileType.Stone);
+
 			}
 
 		return new Map(x,z, tiles);

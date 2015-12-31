@@ -13,7 +13,7 @@ public enum TileType : byte
 
 public class Tile{
 
-    private const float waterOffsetY = 0.001f;
+    private const float waterOffsetY = 0.01f;
 
 	private byte top;
 	private byte vertUp;
@@ -22,8 +22,34 @@ public class Tile{
     private byte waterOutflow; // flags if water is leaving in each direction, so it isn't counted when recalculating water height
 	private TileType type;
     private byte flags; // 1=dirty mesh, 2=dirty type, 4=water, 8 = dirty water, 16 = water source
+    private byte waterEdges;
+    private byte[] surroundingHeights;
+    private byte[] surroundingDepths;
+    private bool[] surroundingWaterEdgePresence;
 
-    private Transform clutter;
+    //private Transform clutter;
+
+    public bool[] WaterEdges
+    {
+        get
+        {
+            bool[] edges = new bool[8];
+            for (int i = 0; i < 8; i++)
+            {
+                edges[i] = ((waterEdges & (1 << i)) != 0);
+            }
+            return edges;
+        }
+        set
+        {
+            waterEdges = 0;
+            for (int i = 0; i < 8; i++)
+            {
+                if (value[i])
+                    waterEdges += (byte) Mathf.Pow(2, i);
+            }
+        }
+    }
 
     public byte[] WaterDepths
     {
@@ -123,16 +149,16 @@ public class Tile{
 		    DirtyType = true;
         }
 	}
-	public Transform Clutter {
+	/*public Transform Clutter {
 		get {
 			return clutter;
 		}
 		set {
 			clutter = value;
 		}
-	}
+	}*/
 
-    private byte[] surroundingHeights;
+
     public byte[] SurroundingHeights
     {
         get
@@ -145,7 +171,7 @@ public class Tile{
         }
     }
 
-    private byte[] surroundingDepths;
+
     public byte[] SurroundingDepths
     {
         get
@@ -155,6 +181,18 @@ public class Tile{
         set
         {
             surroundingDepths = value;
+        }
+    }
+
+    public bool[] SurroundingWaterEdgePresence
+    {
+        get
+        {
+            return surroundingWaterEdgePresence;
+        }
+        set
+        {
+            surroundingWaterEdgePresence = value;
         }
     }
 
@@ -197,14 +235,14 @@ public class Tile{
         get
         {
             int[] maxNeighbourWaterHeights = new int[8];
-            maxNeighbourWaterHeights[0] = Mathf.Max(surroundingHeights[14] + surroundingDepths[14], surroundingHeights[15] + surroundingDepths[15], surroundingHeights[0] + surroundingDepths[0]);
-            maxNeighbourWaterHeights[1] = surroundingHeights[1] + surroundingDepths[1];
-            maxNeighbourWaterHeights[2] = Mathf.Max(surroundingHeights[2] + surroundingDepths[2], surroundingHeights[3] + surroundingDepths[3], surroundingHeights[4] + surroundingDepths[4]);
-            maxNeighbourWaterHeights[3] = surroundingHeights[5] + surroundingDepths[5];
-            maxNeighbourWaterHeights[4] = Mathf.Max(surroundingHeights[6] + surroundingDepths[6], surroundingHeights[7] + surroundingDepths[7], surroundingHeights[8] + surroundingDepths[8]);
-            maxNeighbourWaterHeights[5] = surroundingHeights[9] + surroundingDepths[9];
-            maxNeighbourWaterHeights[6] = Mathf.Max(surroundingHeights[10] + surroundingDepths[10], surroundingHeights[11] + surroundingDepths[11], surroundingHeights[12] + surroundingDepths[12]);
-            maxNeighbourWaterHeights[7] = surroundingHeights[13] + surroundingDepths[13];
+            maxNeighbourWaterHeights[0] = Mathf.Max(surroundingWaterEdgePresence[14] ? surroundingHeights[14] + surroundingDepths[14] : 0, surroundingWaterEdgePresence[0] ? surroundingHeights[0] + surroundingDepths[0] : 0, surroundingWaterEdgePresence[15] ? surroundingHeights[15] + surroundingDepths[15] : 0);
+            maxNeighbourWaterHeights[1] = surroundingWaterEdgePresence[1] ? surroundingHeights[1] + surroundingDepths[1] : 0;
+            maxNeighbourWaterHeights[2] = Mathf.Max(surroundingWaterEdgePresence[2] ? surroundingHeights[2] + surroundingDepths[2] : 0, surroundingWaterEdgePresence[4] ? surroundingHeights[4] + surroundingDepths[4] : 0, surroundingWaterEdgePresence[3] ? surroundingHeights[3] + surroundingDepths[3] : 0);
+            maxNeighbourWaterHeights[3] = surroundingWaterEdgePresence[5] ? surroundingHeights[5] + surroundingDepths[5] : 0;
+            maxNeighbourWaterHeights[4] = Mathf.Max(surroundingWaterEdgePresence[6] ? surroundingHeights[6] + surroundingDepths[6] : 0, surroundingWaterEdgePresence[8] ? surroundingHeights[8] + surroundingDepths[8] : 0, surroundingWaterEdgePresence[7] ? surroundingHeights[7] + surroundingDepths[7] : 0);
+            maxNeighbourWaterHeights[5] = surroundingWaterEdgePresence[9] ? surroundingHeights[9] + surroundingDepths[9] : 0;
+            maxNeighbourWaterHeights[6] = Mathf.Max(surroundingWaterEdgePresence[10] ? surroundingHeights[10] + surroundingDepths[10] : 0, surroundingWaterEdgePresence[12] ? surroundingHeights[12] + surroundingDepths[12] : 0, surroundingWaterEdgePresence[11] ? surroundingHeights[11] + surroundingDepths[11] : 0);
+            maxNeighbourWaterHeights[7] = surroundingWaterEdgePresence[13] ? surroundingHeights[13] + surroundingDepths[13] : 0;
             return maxNeighbourWaterHeights;
         }
     }
@@ -217,20 +255,32 @@ public class Tile{
             int[] mnwh = MaxNeighbourWaterHeights;
             int[] mnd = MaxNeighbourDepths;
             int[] waterHeights = WaterHeights;
+            byte[] h = Heights;
+            bool[] we = WaterEdges;
 
-            if (waterDepths[0] > 0)
+
+           // if (h[0] == 0)
+           //     vertexYs[0] = h[0] - waterOffsetY;
+             if (waterDepths[0] > 0)
                 vertexYs[0] = waterHeights[0] + waterOffsetY;
+            else
+                vertexYs[0] = h[0] - waterOffsetY;
 
             for (int i = 1; i < 9; i++)
             {
-                if (waterDepths[i] > 0)
+                if (we[i-1])
                 {
-                    if (mnd[i - 1] > 0)
-                        vertexYs[i] = Mathf.Max(waterHeights[i], mnwh[i - 1]) + waterOffsetY;
+                    int n = mnwh[i - 1];
+                    if ((n <= 1) && (h[i] == 0))
+                        vertexYs[i] = 0;
                     else
-                        vertexYs[i] = waterHeights[i] + waterOffsetY;
+                        vertexYs[i] = Mathf.Max(waterHeights[i], n) + waterOffsetY;
+                    
                 }
+                else
+                    vertexYs[i] = h[i] - waterOffsetY;
             }
+
             return vertexYs;
         }
     }
@@ -240,8 +290,8 @@ public class Tile{
         this.top = top;
         this.type = type;
 
-        vertUp = 0;
-        vertDown = 0;
+        vertUp = Random.Range(0,5) == 1 ? (byte) Random.Range(0,254): (byte) 0; //; 12;
+        vertDown = Random.Range(0, 5) == 1 ? (byte)Random.Range(0, 254) : (byte) 0;// 54;
         flags = 0;
         waterDepths = new byte[9];
         for (int i = 0; i < 9; i++)
@@ -353,17 +403,31 @@ public class Tile{
         if (WaterSource)
             waterDepths[0] = (byte) (Mathf.Max(1,waterDepths[0]));
 
-        if (waterDepths[0] > 0)
+        bool[] edgeWaterPresence = new bool[8];
+
+        if (Water)
         {
-            Water = true;
             for (int i = 1; i < 9; i++)
             {
+                if (h[0] + waterDepths[0] > h[i])// + waterDepths[i - 1])
+                {
+                    waterDepths[i] = 1;// (byte)(waterDepths[0] - Mathf.Min(0, h[i] - h[0]));
+                    edgeWaterPresence[i - 1] = true;
+                }
+                else if (h[0] + waterDepths[0] == h[i])
+                {
+                    edgeWaterPresence[i - 1] = true;
+                }
+
                 if (waterDepths[i] > 0)
+                {
                     Water = true;
-                if (h[0] + waterDepths[0] > h[i])
-                    waterDepths[i] = (byte)(waterDepths[0]);// - Mathf.Min(0, h[i] - h[0]));
+                    
+                }
             }
         }
+        WaterEdges = edgeWaterPresence;
+
         DirtyWater = true;
 
     }
@@ -380,7 +444,9 @@ public class Tile{
         {
             case 0:
                 pointsToCheck.Add(14);
-                pointsToCheck.Add(15);
+                if (((surroundingHeights[14] < surroundingHeights[15] + surroundingDepths[15]) || (surroundingHeights[0] < surroundingHeights[15] + surroundingDepths[15]))
+                    && (((surroundingHeights[14] > h[1]) && (surroundingHeights[0] > h[1])) || (surroundingHeights[15] > h[1])))
+                    pointsToCheck.Add(15);
                 pointsToCheck.Add(0);
                 break;
             case 1:
@@ -388,7 +454,9 @@ public class Tile{
                 break;
             case 2:
                 pointsToCheck.Add(2);
-                pointsToCheck.Add(3);
+                if (((surroundingHeights[2] < surroundingHeights[3] + surroundingDepths[3]) || (surroundingHeights[4] < surroundingHeights[3] + surroundingDepths[3]))
+                    && (((surroundingHeights[2] > h[3]) && (surroundingHeights[4] > h[3])) || (surroundingHeights[3] > h[3])))
+                    pointsToCheck.Add(3);
                 pointsToCheck.Add(4);
                 break;
             case 3:
@@ -396,7 +464,9 @@ public class Tile{
                 break;
             case 4:
                 pointsToCheck.Add(6);
-                pointsToCheck.Add(7);
+                if (((surroundingHeights[6] < surroundingHeights[7] + surroundingDepths[7]) || (surroundingHeights[8] < surroundingHeights[7] + surroundingDepths[7]))
+                    && (((surroundingHeights[6] > h[5]) && (surroundingHeights[8] > h[5])) || (surroundingHeights[7] > h[5])))
+                    pointsToCheck.Add(7);
                 pointsToCheck.Add(8);
                 break;
             case 5:
@@ -404,7 +474,9 @@ public class Tile{
                 break;
             case 6:
                 pointsToCheck.Add(10);
-                pointsToCheck.Add(11);
+                if (((surroundingHeights[10] < surroundingHeights[11] + surroundingDepths[11]) || (surroundingHeights[12] < surroundingHeights[11] + surroundingDepths[11]))
+                    && (((surroundingHeights[10] > h[7]) && (surroundingHeights[12] > h[7])) || (surroundingHeights[11] > h[7])))
+                    pointsToCheck.Add(11);
                 pointsToCheck.Add(12);
                 break;
             case 7:
@@ -413,13 +485,20 @@ public class Tile{
         }
 
         for (int i=0;i<pointsToCheck.Count;i++)
-            if (surroundingDepths[pointsToCheck[i]] > 0)
-                if (surroundingHeights[pointsToCheck[i]] + surroundingDepths[pointsToCheck[i]] > h[p+1])
-                    newDepth = 1;// (byte)Mathf.Max(newDepth, surroundingHeights[pointsToCheck[i]] + surroundingDepths[pointsToCheck[i]] - h[i + 1] - 1);
+            if (surroundingWaterEdgePresence[pointsToCheck[i]])
+                //if (surroundingDepths[pointsToCheck[i]] > 0)
+                    if (surroundingHeights[pointsToCheck[i]] + surroundingDepths[pointsToCheck[i]] > h[p+1])
+                        newDepth =  (byte) Mathf.Max(newDepth, surroundingHeights[pointsToCheck[i]] + surroundingDepths[pointsToCheck[i]] - h[p + 1]);
 
         if (newDepth > 0)
-            if (h[p+1] + newDepth > h[0] + waterDepths[0])
-                waterDepths[0] = 1;// (byte)(newDepth);// - Mathf.Min(0, h[0] - h[i+1]));
+        {
+            if ((h[p + 1] + newDepth > h[0] + waterDepths[0]) && (h[0] > 0))
+                waterDepths[0] = 1;// (byte)((newDepth) - Mathf.Min(0, h[0] - h[p + 1]));
+            bool[] edgeWaterPresence = WaterEdges;
+            edgeWaterPresence[p] = true;
+            Water = true;
+            WaterEdges = edgeWaterPresence;
+        }
 
         return newDepth;
     }
