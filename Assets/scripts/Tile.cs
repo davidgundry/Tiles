@@ -8,7 +8,12 @@ public enum TileTexture : byte
 
 public enum TileType : byte
 {
-	Dirt, Grass, Water, Tree, Stone, Sand
+	Stone,
+    Riverbed,
+    Dirt,
+    Grass,
+    Tree,
+    Sand
 }
 
 public class Tile{
@@ -235,13 +240,28 @@ public class Tile{
         get
         {
             int[] maxNeighbourWaterHeights = new int[8];
-            maxNeighbourWaterHeights[0] = Mathf.Max(surroundingWaterEdgePresence[14] ? surroundingHeights[14] + surroundingDepths[14] : 0, surroundingWaterEdgePresence[0] ? surroundingHeights[0] + surroundingDepths[0] : 0, surroundingWaterEdgePresence[15] ? surroundingHeights[15] + surroundingDepths[15] : 0);
+            maxNeighbourWaterHeights[0] = Mathf.Max(surroundingWaterEdgePresence[14] ? surroundingHeights[14] + surroundingDepths[14] : 0,
+                                                    surroundingWaterEdgePresence[0] ? surroundingHeights[0] + surroundingDepths[0] : 0,
+                                                    surroundingWaterEdgePresence[15] ? surroundingHeights[15] + surroundingDepths[15] : 0);
+
             maxNeighbourWaterHeights[1] = surroundingWaterEdgePresence[1] ? surroundingHeights[1] + surroundingDepths[1] : 0;
-            maxNeighbourWaterHeights[2] = Mathf.Max(surroundingWaterEdgePresence[2] ? surroundingHeights[2] + surroundingDepths[2] : 0, surroundingWaterEdgePresence[4] ? surroundingHeights[4] + surroundingDepths[4] : 0, surroundingWaterEdgePresence[3] ? surroundingHeights[3] + surroundingDepths[3] : 0);
+
+            maxNeighbourWaterHeights[2] = Mathf.Max(surroundingWaterEdgePresence[2] ? surroundingHeights[2] + surroundingDepths[2] : 0,
+                                                    surroundingWaterEdgePresence[4] ? surroundingHeights[4] + surroundingDepths[4] : 0,
+                                                    surroundingWaterEdgePresence[3] ? surroundingHeights[3] + surroundingDepths[3] : 0);
+
             maxNeighbourWaterHeights[3] = surroundingWaterEdgePresence[5] ? surroundingHeights[5] + surroundingDepths[5] : 0;
-            maxNeighbourWaterHeights[4] = Mathf.Max(surroundingWaterEdgePresence[6] ? surroundingHeights[6] + surroundingDepths[6] : 0, surroundingWaterEdgePresence[8] ? surroundingHeights[8] + surroundingDepths[8] : 0, surroundingWaterEdgePresence[7] ? surroundingHeights[7] + surroundingDepths[7] : 0);
+
+            maxNeighbourWaterHeights[4] = Mathf.Max(surroundingWaterEdgePresence[6] ? surroundingHeights[6] + surroundingDepths[6] : 0,
+                                                    surroundingWaterEdgePresence[8] ? surroundingHeights[8] + surroundingDepths[8] : 0,
+                                                    surroundingWaterEdgePresence[7] ? surroundingHeights[7] + surroundingDepths[7] : 0);
+
             maxNeighbourWaterHeights[5] = surroundingWaterEdgePresence[9] ? surroundingHeights[9] + surroundingDepths[9] : 0;
-            maxNeighbourWaterHeights[6] = Mathf.Max(surroundingWaterEdgePresence[10] ? surroundingHeights[10] + surroundingDepths[10] : 0, surroundingWaterEdgePresence[12] ? surroundingHeights[12] + surroundingDepths[12] : 0, surroundingWaterEdgePresence[11] ? surroundingHeights[11] + surroundingDepths[11] : 0);
+
+            maxNeighbourWaterHeights[6] = Mathf.Max(surroundingWaterEdgePresence[10] ? surroundingHeights[10] + surroundingDepths[10] : 0,
+                                                    surroundingWaterEdgePresence[12] ? surroundingHeights[12] + surroundingDepths[12] : 0,
+                                                    surroundingWaterEdgePresence[11] ? surroundingHeights[11] + surroundingDepths[11] : 0);
+
             maxNeighbourWaterHeights[7] = surroundingWaterEdgePresence[13] ? surroundingHeights[13] + surroundingDepths[13] : 0;
             return maxNeighbourWaterHeights;
         }
@@ -274,8 +294,10 @@ public class Tile{
                     if ((n <= 1) && (h[i] == 0))
                         vertexYs[i] = 0;
                     else
-                        vertexYs[i] = Mathf.Max(waterHeights[i], n) + waterOffsetY;
-                    
+                        if (n==0)
+                            vertexYs[i] = waterHeights[i] -1 + waterOffsetY;
+                        else
+                            vertexYs[i] = Mathf.Max(waterHeights[i], n) + waterOffsetY;
                 }
                 else
                     vertexYs[i] = h[i] - waterOffsetY;
@@ -487,7 +509,7 @@ public class Tile{
         for (int i=0;i<pointsToCheck.Count;i++)
             if (surroundingWaterEdgePresence[pointsToCheck[i]])
                 //if (surroundingDepths[pointsToCheck[i]] > 0)
-                    if (surroundingHeights[pointsToCheck[i]] + surroundingDepths[pointsToCheck[i]] > h[p+1])
+                    if (surroundingHeights[pointsToCheck[i]] + surroundingDepths[pointsToCheck[i]] > h[p+1] + 1)
                         newDepth =  (byte) Mathf.Max(newDepth, surroundingHeights[pointsToCheck[i]] + surroundingDepths[pointsToCheck[i]] - h[p + 1]);
 
         if (newDepth > 0)

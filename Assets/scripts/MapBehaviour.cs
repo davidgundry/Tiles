@@ -24,6 +24,11 @@ public class MapBehaviour : MonoBehaviour, Clickable
     private Vector3[] waterVerts;
 	private int scale = 2;
 
+    private int tileUpdateOffset = 0;
+    private float tileUpdateTime = 0;
+
+    private Dictionary<Coordinate, Transform> clutter;
+
     public void NewMap(Map map)
     {
         this.map = map;
@@ -37,9 +42,10 @@ public class MapBehaviour : MonoBehaviour, Clickable
 		mf = GetComponent<MeshFilter>();
         bmf = transform.GetChild(0).GetComponent<MeshFilter>();
         wmf = transform.GetChild(1).GetComponent<MeshFilter>();
-        wmf.mesh.bounds = new Bounds(new Vector3(map.X + map.Width/2,0,map.Z+map.Height/2), new Vector3(map.Width, 256, map.Height));
+        wmf.mesh.bounds = new Bounds(new Vector3(map.X + map.Width/2,0,map.Z+map.Height/2), new Vector3(map.Width*2, 256, map.Height*2));
         verts = mf.mesh.vertices;
         waterVerts = wmf.mesh.vertices;
+        clutter = new Dictionary<Coordinate,Transform>();
     }
 
     void UpdateTile(int i, int j, out bool someDirtyMesh, out bool someDirtyWater)
@@ -50,27 +56,53 @@ public class MapBehaviour : MonoBehaviour, Clickable
         if (map.Tiles[i, j] != null)
         {
             if (map.Tiles[i, j].Water)
-                if (map.Tiles[i, j].Type != TileType.Sand)
-                    map.Tiles[i, j].Type = TileType.Sand;
+                if (map.Tiles[i, j].Type != TileType.Riverbed)
+                    map.Tiles[i, j].Type = TileType.Riverbed;
 
-            if (map.Tiles[i, j].Type == TileType.Stone)
-            {
-                bool sandNearby = false;
-                bool treeNearby = false;
-                TileType[] neighbours = GetNeighbourTypes(i, j, 1);
+                int[] neighbourTypeCount = new int[TileType.GetValues(typeof(TileType)).Length];
+                TileType[] neighbours = GetNeighbourTypes(i, j, 1); 
                 foreach (TileType neighbourType in neighbours)
                 {
-                    if (neighbourType == TileType.Sand)
-                        sandNearby = true;
-                    if (neighbourType == TileType.Tree)
-                        treeNearby = true;
+                    int t = 0;
+                    foreach (TileType tileType in TileType.GetValues(typeof(TileType)))
+                    {
+                        if (neighbourType == tileType)
+                            neighbourTypeCount[t]++;
+                        t++;
+                    }
                 }
-                if (sandNearby)
-                    map.Tiles[i, j].Type = TileType.Grass;
-                if (treeNearby)
-                    if (map.Tiles[i, j].Type == TileType.Stone)
-                        map.Tiles[i, j].Type = TileType.Grass;
-            }
+
+                switch (map.Tiles[i, j].Type)
+                {
+                    case TileType.Stone:
+                        if (neighbourTypeCount[1] > 0) //Riverbed
+                            map.Tiles[i, j].Type = TileType.Dirt;
+                        if (neighbourTypeCount[3] > 0) // Grass
+                            map.Tiles[i, j].Type = TileType.Dirt;
+                        break;
+                    case TileType.Dirt:
+                        if (neighbourTypeCount[1] > 0)  //Riverbed
+                            if (Random.value > 0.9)
+                                map.Tiles[i, j].Type = TileType.Grass;
+                        if (neighbourTypeCount[4] > 0) //Tree
+                            map.Tiles[i, j].Type = TileType.Grass;
+                        break;
+                    case TileType.Grass:
+                        if ((neighbourTypeCount[4] <3) && (neighbourTypeCount[3] > 3) && (neighbourTypeCount[1] > 0)) //Tree and 4 Grass and Riverbed
+                            AddTree(i, j);
+                        break;
+                    case TileType.Tree:
+                        if ((neighbourTypeCount[4] > 3))
+                        {
+                            RemoveTree(i, j);
+                            map.Tiles[i, j].Type = TileType.Dirt;
+                        }
+                        break;
+                }
+               
+                //if (treeNearby)
+                    //if (map.Tiles[i, j].Type == TileType.Stone)
+                        //map.Tiles[i, j].Type = TileType.Grass;
 
 
             byte[] surroundingHeights = new byte[16];
@@ -188,15 +220,34 @@ public class MapBehaviour : MonoBehaviour, Clickable
 
     void Update()
     {
+
         if (map != null)
         {
             bool someDirtyMesh = false;
             bool someDirtyWater = false;
 
-            for (int i = 0; i < map.Width; i++)
-                for (int j = 0; j < map.Height; j++)
-                    if (Random.value > 0.95f)
-                        UpdateTile(i,j, out someDirtyMesh, out someDirtyWater);
+
+            if (tileUpdateTime >= 0.2f)
+            {
+                if (tileUpdateOffset == 10)
+                    tileUpdateOffset = 0;
+                tileUpdateTime = 0;
+            }
+            else
+            {
+                tileUpdateTime += Time.deltaTime;
+            }
+
+            if (tileUpdateOffset < 10)
+            {
+
+                for (int i = tileUpdateOffset; i < map.Width * map.Height; i += 10)
+                    UpdateTile(i / map.Height, i % map.Height, out someDirtyMesh, out someDirtyWater);
+
+                tileUpdateOffset = (tileUpdateOffset + 1);
+            }
+
+
 
             if (someDirtyMesh)
             {
@@ -211,6 +262,7 @@ public class MapBehaviour : MonoBehaviour, Clickable
                 wmf.mesh.RecalculateNormals();
             }
         }
+
 
         /*if (!updatedTiles)
         {
@@ -366,6 +418,8 @@ public class MapBehaviour : MonoBehaviour, Clickable
         {
             case TileType.Stone:
                 return TileTexture.Stone;
+            case TileType.Riverbed:
+                return TileTexture.Stone;
             case TileType.Grass:
                 return TileTexture.Grass;
             case TileType.Dirt:
@@ -391,12 +445,13 @@ public class MapBehaviour : MonoBehaviour, Clickable
     {
         switch (texture)
         {
-            case TileTexture.Grass:
-                return new Vector2(0.05f, 0.05f);
-            case TileTexture.Dirt:
-                return new Vector2(0.05f, 0.55f);
             case TileTexture.Stone:
                 return new Vector2(0.55f, 0.55f);
+            case TileTexture.Dirt:
+                return new Vector2(0.05f, 0.55f);
+            case TileTexture.Grass:
+                return new Vector2(0.05f, 0.05f);
+           
             case TileTexture.Sand:
                 return new Vector2(0.55f, 0.05f);
         }
@@ -846,6 +901,25 @@ public class MapBehaviour : MonoBehaviour, Clickable
 		}
 	}*/
 
+    private void AddTree(int x,int z)
+    {
+        if (map.Tiles[x, z].Type != TileType.Tree)
+        {
+            map.Tiles[x, z].Type = TileType.Tree;
+            clutter.Add(new Coordinate(x, z), (Transform)Instantiate(treePrefab, new Vector3(x * scale + scale / 2, map.Tiles[x, z].Top, z * scale + scale / 2), new Quaternion()));
+        }
+    }
+
+    private void RemoveTree(int x, int z)
+    {
+        Transform tree = null;
+        clutter.TryGetValue(new Coordinate(x, z), out tree);
+        if (tree != null)
+        {
+            GameObject.Destroy(tree);
+            clutter.Remove(new Coordinate(x, z));
+        }
+    }
 
     public void OnClickFromCamera(Vector3 point)
     {
@@ -853,11 +927,20 @@ public class MapBehaviour : MonoBehaviour, Clickable
         int z = (int)((point.z - transform.position.z) / scale);
 
         //RunRiver(x, z,0);
-        if (map.Tiles[x,z].Type == TileType.Stone)
-            map.Tiles[x, z].AddSpring();
+        switch (map.Tiles[x, z].Type)
+        {
+            case TileType.Stone:
+                map.Tiles[x, z].AddSpring();
+                break;
+            case TileType.Grass:
+                AddTree(x,z);
+                break;
+        }
 
-        if ((map.Tiles[x, z].Type == TileType.Grass) && (!map.Tiles[x, z].Water))
-            map.Tiles[x, z].Type = TileType.Tree;
+            
+
+       // if ((map.Tiles[x, z].Type == TileType.Grass) && (!map.Tiles[x, z].Water))
+       //     map.Tiles[x, z].Type = TileType.Tree;
 
         bool a, b;
         UpdateTile(x, z, out a, out b);
@@ -974,5 +1057,18 @@ public class MapBehaviour : MonoBehaviour, Clickable
                 }
             }
         return neighbours.ToArray();
+    }
+}
+
+
+public class Coordinate
+{
+    int x;
+    int z;
+
+    public Coordinate(int x, int z)
+    {
+        this.x = x;
+        this.z = z;
     }
 }

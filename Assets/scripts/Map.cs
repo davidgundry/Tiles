@@ -71,7 +71,7 @@ public class Map {
 			for (int j = 0; j < height; j++)
 			{
 
-                byte top = (byte)(((i % 5 + j % 5) * ((i%20)+1) % ((j%20) + 1) + ((i%20) * (j%20))/ 10));// (byte)(UnityEngine.Random.Range(0, 5));
+                byte top = (byte)(width + 1 - 2*Mathf.Sqrt(Mathf.Pow(i - width / 2, 2) + Mathf.Pow(j - width / 2, 2)));  //(((i % 5 + j % 5) * ((i%20)+1) % ((j%20) + 1) + ((i%20) * (j%20))/ 10));// (byte)(UnityEngine.Random.Range(0, 5));
                 if ((i == 0) || (j == 0) || (i == width - 1) || (j == height - 1))
                     top = 0;
                 //if (top > 0)

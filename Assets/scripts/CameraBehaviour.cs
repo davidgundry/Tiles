@@ -22,7 +22,7 @@ public class CameraBehaviour : MonoBehaviour {
 	public bool inputEnabled = true;
 
     //Camera orbit properties
-    private float distance = 20.0f;
+    private float distance = 30.0f;
     private float xSpeed = 100;
     private float ySpeed = 100;
     private float orbitSpeed = 0.1f;
@@ -34,7 +34,7 @@ public class CameraBehaviour : MonoBehaviour {
     private float zoomSpeed = 2.5f;
     private float perspectiveZoomSpeed = 20f;
 
-    private float yMinLimit = 20f;
+    private float yMinLimit = 30f;
     private float yMaxLimit = 80f;
 
     private float distanceMin = 1f;
@@ -59,6 +59,7 @@ public class CameraBehaviour : MonoBehaviour {
     private bool pinchTouch;
     private bool movedSinceTouch;
     private bool touch;
+    private bool pan;
 
     public void Start ()
 	{
@@ -129,6 +130,11 @@ public class CameraBehaviour : MonoBehaviour {
         }
     }
 
+    public void TogglePanAndRotate()
+    {
+        pan = !pan;
+    }
+
     private void ManageMouseInput()
     {
         bool panning = Input.GetMouseButton(2);
@@ -160,7 +166,8 @@ public class CameraBehaviour : MonoBehaviour {
         }
         else if (Input.touchCount == 1)
         {
-            panning = true;
+            panning = pan;
+            rotating = !pan;
             clicking = false;
             xAxisMovement = Input.touches[0].deltaPosition.x / 10;
             yAxisMovement = Input.touches[0].deltaPosition.y / 10;

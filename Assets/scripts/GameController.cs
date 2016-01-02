@@ -22,6 +22,12 @@ public class GameController : MonoBehaviour {
 		camera = mainCamera.GetComponent<CameraBehaviour> ();
 		maps = new Transform[3];
 		createMap (0, 0, 0);
+        ChangeActiveMap(0);
+
+        Map m = maps[activeMap].GetComponent<MapBehaviour>().Map;
+        target = new Vector3(m.X + m.Width / 2, m.Tiles[m.Width / 2, m.Height / 2].Top/2, m.Z + m.Height / 2);
+        cameraBounds.transform.position = target;
+
 		//createMap (1, 50, 50);
 		//createMap (2, 50, 10);
     }
@@ -65,7 +71,7 @@ public class GameController : MonoBehaviour {
 		Debug.Log ("Level " + newMap);
 		activeMap = newMap;
 		Map m = maps [activeMap].GetComponent<MapBehaviour> ().Map;
-		target = new Vector3(m.X,0,m.Z);
+		target = new Vector3(m.X + m.Width/2, m.Tiles[m.Width/2,m.Height/2].Top/2,m.Z + m.Height/2);
 		changingMap = true;
 		camera.inputEnabled = false;
 		camera.target.transform.localPosition = new Vector3 (0, 0, 0);
